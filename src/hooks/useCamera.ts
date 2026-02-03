@@ -2,7 +2,7 @@ import { useCallback, useEffect } from 'react';
 
 import { useStore } from '../store/useStore';
 
-export const useCamera = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
+export const useCamera = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
   // Bind directly to the global store
   const camera = useStore((state) => state.camera);
   const setCamera = useStore((state) => state.setCamera);

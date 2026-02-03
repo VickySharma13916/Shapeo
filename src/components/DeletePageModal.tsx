@@ -1,4 +1,4 @@
-import React from 'react';
+'use client';
 import { AlertCircle } from 'lucide-react';
 import { useStore } from '../store/useStore';
 

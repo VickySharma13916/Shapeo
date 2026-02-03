@@ -9,11 +9,13 @@ export type Camera = {
   zoom: number;
 };
 
-export enum ShapeType {
-  Rectangle = 'rect',
-  Circle = 'circle',
-  Image = 'image',
-}
+export const ShapeType = {
+  Rectangle: 'rect',
+  Circle: 'circle',
+  Image: 'image',
+} as const;
+
+export type ShapeType = typeof ShapeType[keyof typeof ShapeType];
 
 // Added support for professional styling properties
 export interface BaseShape {
@@ -42,15 +44,15 @@ export interface BaseShape {
 }
 
 export interface RectShape extends BaseShape {
-  type: ShapeType.Rectangle;
+  type: 'rect';
 }
 
 export interface CircleShape extends BaseShape {
-  type: ShapeType.Circle;
+  type: 'circle';
 }
 
 export interface ImageShape extends BaseShape {
-  type: ShapeType.Image;
+  type: 'image';
   src: string;
   imageElement?: HTMLImageElement;
 }

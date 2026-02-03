@@ -1,4 +1,4 @@
-import React from 'react';
+'use client';
 import { Hand, MousePointer2, Plus, RotateCcw, RotateCw, SquareDashed, Trash2 } from 'lucide-react';
 import { ShapeType } from '../engine/types';
 import { useStore } from '../store/useStore';

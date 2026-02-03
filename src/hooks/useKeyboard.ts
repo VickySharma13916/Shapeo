@@ -2,9 +2,11 @@ import { useEffect } from 'react';
 
 import { useStore } from '../store/useStore';
 
+import type { Shape } from '../engine/types';
+
 export const useKeyboard = () => {
   // Use the updated pluralized actions from your store
-  const { copy, paste, deleteShapes, selectedIds, setSelectedIds, shapes, undo, redo, cut,setMode, pages, currentPageId } = useStore();
+  const { copy, paste, deleteShapes, selectedIds, setSelectedIds, undo, redo, cut, setMode, pages, currentPageId, updateShape, saveHistory, toggleRightSidebar, toggleLeftSidebar } = useStore();
 
   useEffect(() => {
     const currentPageShapes = pages.find(p => p.id === currentPageId)?.shapes || [];
@@ -25,7 +27,8 @@ export const useKeyboard = () => {
         e.preventDefault();
         
         selectedIds.forEach(id => {
-          const shape = shapes.find(s => s.id === id);
+          const currentPage = pages.find(p => p.id === currentPageId);
+          const shape = currentPage?.shapes.find((s: Shape) => s.id === id);
           if (!shape) return;
 
           let updates = {};
@@ -107,5 +110,5 @@ export const useKeyboard = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [copy, paste, deleteShapes, selectedIds, setSelectedIds, shapes, undo, redo, cut, setMode, pages, currentPageId]);
+  }, [copy, paste, deleteShapes, selectedIds, setSelectedIds, undo, redo, cut, setMode, pages, currentPageId, updateShape, saveHistory, toggleLeftSidebar, toggleRightSidebar]);
 };

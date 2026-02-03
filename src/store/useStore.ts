@@ -36,6 +36,7 @@ interface SceneState {
   addPage: () => void;
   setCurrentPage: (id: string) => void;
   setConfirmDeleteId: (id: string | null) => void;
+  deletePage: (id: string) => void;
   
   // --- Object Manipulation ---
   addShape: (type: ShapeType) => void;
@@ -55,6 +56,10 @@ interface SceneState {
   copy: () => void;
   paste: () => void;
   cut: () => void;
+  
+  // --- Image Actions ---
+  addImage: (file: File) => void;
+  deleteImage: (id: string) => void;
 }
 
 export const useStore = create<SceneState>()(
@@ -123,7 +128,8 @@ export const useStore = create<SceneState>()(
           id: newId, type, x: centerX - 50, y: centerY - 50,
           width: 100, height: 100, fill: '#D9D9D9',
           stroke: '#000000', strokeWidth: 1, rotation: 0,
-        };
+          ...(type === ShapeType.Image ? { src: '' } : {}),
+        } as Shape;
 
         const updatedPages = pages.map(p => 
           p.id === currentPageId ? { ...p, shapes: [...p.shapes, newShape] } : p
@@ -134,12 +140,13 @@ export const useStore = create<SceneState>()(
       },
 
       updateShape: (id, updates, commitToHistory = false) => {
-        set((state) => ({
-          pages: state.pages.map(p => p.id === state.currentPageId ? {
+        set((state) => {
+          const updatedPages = state.pages.map(p => p.id === state.currentPageId ? {
             ...p,
-            shapes: p.shapes.map(s => s.id === id ? { ...s, ...updates } : s)
-          } : p)
-        }));
+            shapes: p.shapes.map(s => s.id === id ? ({ ...s, ...updates } as Shape) : s)
+          } : p);
+          return { pages: updatedPages };
+        });
         if (commitToHistory) get().saveHistory();
       },
 
@@ -177,6 +184,18 @@ export const useStore = create<SceneState>()(
             y: (window.innerHeight / 2) - (shape.y + shape.height / 2) * camera.zoom,
           }
         });
+      },
+
+      zoomIn: () => {
+        const { camera } = get();
+        const newZoom = Math.min(camera.zoom * 1.2, 50);
+        set({ camera: { ...camera, zoom: newZoom } });
+      },
+
+      zoomOut: () => {
+        const { camera } = get();
+        const newZoom = Math.max(camera.zoom / 1.2, 0.05);
+        set({ camera: { ...camera, zoom: newZoom } });
       },
 
       // --- History ---
