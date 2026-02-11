@@ -43,6 +43,9 @@ interface SceneState {
   updateShape: (id: string, updates: Partial<Shape>, commitToHistory?: boolean) => void;
   deleteShapes: () => void;
   bringToFront: () => void;
+  sendToBack: () => void;
+  moveForward: () => void;
+  moveBackward: () => void;
   centerObject: (id: string) => void;
 
   // --- View Actions ---
@@ -161,7 +164,7 @@ export const useStore = create<SceneState>()(
       },
 
       bringToFront: () => {
-        const { selectedIds, pages, currentPageId } = get();
+        const { selectedIds, pages, currentPageId, saveHistory } = get();
         if (selectedIds.length === 0) return;
         const updatedPages = pages.map(p => {
           if (p.id !== currentPageId) return p;
@@ -170,6 +173,58 @@ export const useStore = create<SceneState>()(
           return { ...p, shapes: [...others, ...selected] };
         });
         set({ pages: updatedPages });
+        saveHistory();
+      },
+
+      sendToBack: () => {
+        const { selectedIds, pages, currentPageId, saveHistory } = get();
+        if (selectedIds.length === 0) return;
+        const updatedPages = pages.map(p => {
+          if (p.id !== currentPageId) return p;
+          const selected = p.shapes.filter(s => selectedIds.includes(s.id));
+          const others = p.shapes.filter(s => !selectedIds.includes(s.id));
+          return { ...p, shapes: [...selected, ...others] };
+        });
+        set({ pages: updatedPages });
+        saveHistory();
+      },
+
+      moveForward: () => {
+        const { selectedIds, pages, currentPageId, saveHistory } = get();
+        if (selectedIds.length === 0) return;
+        const updatedPages = pages.map(p => {
+          if (p.id !== currentPageId) return p;
+          const shapes = [...p.shapes];
+          
+          // Move each selected shape forward one position
+          for (let i = shapes.length - 2; i >= 0; i--) {
+            if (selectedIds.includes(shapes[i].id) && !selectedIds.includes(shapes[i + 1].id)) {
+              [shapes[i], shapes[i + 1]] = [shapes[i + 1], shapes[i]];
+            }
+          }
+          return { ...p, shapes };
+        });
+        set({ pages: updatedPages });
+        saveHistory();
+      },
+
+      moveBackward: () => {
+        const { selectedIds, pages, currentPageId, saveHistory } = get();
+        if (selectedIds.length === 0) return;
+        const updatedPages = pages.map(p => {
+          if (p.id !== currentPageId) return p;
+          const shapes = [...p.shapes];
+          
+          // Move each selected shape backward one position
+          for (let i = 1; i < shapes.length; i++) {
+            if (selectedIds.includes(shapes[i].id) && !selectedIds.includes(shapes[i - 1].id)) {
+              [shapes[i], shapes[i - 1]] = [shapes[i - 1], shapes[i]];
+            }
+          }
+          return { ...p, shapes };
+        });
+        set({ pages: updatedPages });
+        saveHistory();
       },
 
       centerObject: (id) => {

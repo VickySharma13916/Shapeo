@@ -17,7 +17,8 @@ export function worldToScreen(point: Point, camera: Camera): Point {
 }
 
 export function isPointInShape(point: Point, shape: Shape): boolean {
-  if (shape.type === ShapeType.Rectangle) {
+  // Both Rectangle and Image use the same bounding box hit detection
+  if (shape.type === ShapeType.Rectangle || shape.type === ShapeType.Image) {
     return (
       point.x >= shape.x &&
       point.x <= shape.x + shape.width &&

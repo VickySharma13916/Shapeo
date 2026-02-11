@@ -7,12 +7,16 @@ import { useStore } from '../store/useStore';
 import { GRID_SIZE, MIN_SIZE } from '../utils/Common';
 
 import { screenToWorld, isPointInShape } from '../engine/utils';
-import type { Point, Shape } from '../engine/types';
+import type { Point } from '../engine/types';
+
+import { getEdgeHandleAtPos, getHandleAtPos, getRadiusHandleAtPos, getRotationHandleAtPos } from '../utils/CommonFunctions';
 
 const Canvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDraggingRef = useRef(false);
   const isDraggingRadiusRef = useRef(false);
+  const isDraggingRotationRef = useRef(false);
+  const rotationStartAngleRef = useRef(0);
   const dragOffset = useRef<{ [key: string]: { x: number; y: number } }>({});
   const activeHandleRef = useRef<string | null>(null);
   const isDraggingCanvasRef = useRef(false);
@@ -35,23 +39,6 @@ const Canvas = () => {
 
   const [cursor, setCursor] = useState<string>('default');
 
-  // Helper to find radius handles in any of the 4 corners
-  const getRadiusHandleAtPos = (worldPos: Point, shape: Shape, zoom: number) => {
-    const rMargin = Math.min(shape.width, shape.height, 64 / zoom) * 0.15;
-    const size = 12 / zoom;
-    
-    const positions = [
-      { id: 'tl', x: shape.x + rMargin, y: shape.y + rMargin },
-      { id: 'tr', x: shape.x + shape.width - rMargin, y: shape.y + rMargin },
-      { id: 'bl', x: shape.x + rMargin, y: shape.y + shape.height - rMargin },
-      { id: 'br', x: shape.x + shape.width - rMargin, y: shape.y + shape.height - rMargin }
-    ];
-    
-    return positions.find(p => 
-      Math.abs(worldPos.x - p.x) < size && Math.abs(worldPos.y - p.y) < size
-    );
-  };
-
   const updateCursor = (worldPos: Point) => {
     if (mode === 'pan') {
       setCursor('grab');
@@ -61,12 +48,31 @@ const Canvas = () => {
     if (selectedIds.length === 1) {
       const shape = shapes.find(s => s.id === selectedIds[0]);
       if (shape) {
+        const rotationHandle = getRotationHandleAtPos(worldPos, shape, camera.zoom);
+        const radiusHandle = getRadiusHandleAtPos(worldPos, shape, camera.zoom);
         const handle = getHandleAtPos(worldPos, shape, camera.zoom);
-        const threshold = 4 / camera.zoom;
+        const edgeHandle = getEdgeHandleAtPos(worldPos, shape, camera.zoom);
+        const threshold = 6 / camera.zoom;
         
+        if (rotationHandle) {
+          setCursor('grab');
+          return;
+        }
+        
+        if (radiusHandle) {
+          setCursor('pointer');
+          return;
+        }
+
         if (handle) {
           if (handle.id === 'nw' || handle.id === 'se') setCursor('nwse-resize');
           else if (handle.id === 'ne' || handle.id === 'sw') setCursor('nesw-resize');
+          return;
+        }
+
+        if (edgeHandle) {
+          if (edgeHandle.id === 'e' || edgeHandle.id === 'w') setCursor('ew-resize');
+          else setCursor('ns-resize');
           return;
         }
 
@@ -98,7 +104,16 @@ const Canvas = () => {
     if (selectedIds.length === 1) {
       const selectedShape = shapes.find(s => s.id === selectedIds[0]);
       if (selectedShape) {
-        // Check for Radius Handle First
+        // Rotation handle gets highest priority
+        if (getRotationHandleAtPos(worldPos, selectedShape, camera.zoom)) {
+          isDraggingRotationRef.current = true;
+          const dx = worldPos.x - (selectedShape.x + selectedShape.width / 2);
+          const dy = worldPos.y - (selectedShape.y + selectedShape.height / 2);
+          rotationStartAngleRef.current = Math.atan2(dy, dx) * (180 / Math.PI) - 90 - (selectedShape.rotation || 0);
+          return;
+        }
+        
+        // Radius handles get priority when directly hit
         if (getRadiusHandleAtPos(worldPos, selectedShape, camera.zoom)) {
           isDraggingRadiusRef.current = true;
           return;
@@ -107,6 +122,12 @@ const Canvas = () => {
         const handle = getHandleAtPos(worldPos, selectedShape, camera.zoom);
         if (handle) {
           activeHandleRef.current = handle.id;
+          return;
+        }
+
+        const edgeHandle = getEdgeHandleAtPos(worldPos, selectedShape, camera.zoom);
+        if (edgeHandle) {
+          activeHandleRef.current = edgeHandle.id;
           return;
         }
       }
@@ -164,6 +185,19 @@ const Canvas = () => {
       return;
     }
 
+    // Handle Rotation Dragging
+    if (isDraggingRotationRef.current && selectedIds.length === 1) {
+      const shape = shapes.find(s => s.id === selectedIds[0]);
+      if (shape) {
+        const dx = worldPos.x - (shape.x + shape.width / 2);
+        const dy = worldPos.y - (shape.y + shape.height / 2);
+        const angle = Math.atan2(dy, dx) * (180 / Math.PI) - 90;
+        const newRotation = angle - rotationStartAngleRef.current;
+        updateShape(shape.id, { rotation: Math.round(newRotation) });
+      }
+      return;
+    }
+
     // Handle Radius Dragging
     if (isDraggingRadiusRef.current && selectedIds.length === 1) {
       const shape = shapes.find(s => s.id === selectedIds[0]);
@@ -204,30 +238,17 @@ const Canvas = () => {
   };
 
   const handleMouseUp = () => {
-    if (isDraggingRef.current || activeHandleRef.current || marqueeStartRef.current || isDraggingRadiusRef.current) {
+    if (isDraggingRef.current || activeHandleRef.current || marqueeStartRef.current || isDraggingRadiusRef.current || isDraggingRotationRef.current) {
       saveHistory(); 
     }
     isDraggingRef.current = false;
     isDraggingRadiusRef.current = false;
+    isDraggingRotationRef.current = false;
     activeHandleRef.current = null;
     isDraggingCanvasRef.current = false;
     marqueeStartRef.current = null;
     setMarqueeRect(null);
     dragOffset.current = {};
-  };
-
-  const getHandleAtPos = (worldPos: { x: number; y: number }, shape: Shape, zoom: number) => {
-    const handleSize = 10 / zoom;
-    const handles = [
-      { id: 'nw', x: shape.x, y: shape.y },
-      { id: 'ne', x: shape.x + shape.width, y: shape.y },
-      { id: 'sw', x: shape.x, y: shape.y + shape.height },
-      { id: 'se', x: shape.x + shape.width, y: shape.y + shape.height },
-    ];
-    return handles.find(h => 
-      worldPos.x >= h.x - handleSize/2 && worldPos.x <= h.x + handleSize/2 &&
-      worldPos.y >= h.y - handleSize/2 && worldPos.y <= h.y + handleSize/2
-    );
   };
 
   useEffect(() => {
@@ -271,6 +292,15 @@ const Canvas = () => {
         ctx.save();
         ctx.globalAlpha = shape.opacity ?? 1;
 
+        // Apply rotation transform
+        if (shape.rotation && shape.rotation !== 0) {
+          const centerX = shape.x + shape.width / 2;
+          const centerY = shape.y + shape.height / 2;
+          ctx.translate(centerX, centerY);
+          ctx.rotate((shape.rotation * Math.PI) / 180);
+          ctx.translate(-centerX, -centerY);
+        }
+
         if (shape.shadow?.enabled) {
           ctx.shadowColor = shape.shadow.color;
           ctx.shadowBlur = shape.shadow.blur;
@@ -289,12 +319,12 @@ const Canvas = () => {
             const img = new Image();
             img.src = shape.src;
             img.onload = () => {
-              (shape as any).imageElement = img;
+              shape.imageElement = img;
               // No extra logic needed, the next frame will pick up the element
             };
           }
 
-          const imgElement = (shape as any).imageElement;
+          const imgElement = shape.imageElement;
           if (imgElement instanceof HTMLImageElement && imgElement.complete) {
             ctx.save();
             ctx.clip();
@@ -348,7 +378,8 @@ const Canvas = () => {
           if (selectedIds.includes(shape.id) && selectedIds.length === 1) {
             const rHandleSize = 4 / camera.zoom;
             // Set a maximum margin so handles don't overlap in small shapes
-            const rMargin = Math.min(shape.width, shape.height, 64 / camera.zoom) * 0.15;
+            const baseMargin = Math.min(shape.width, shape.height, 64 / camera.zoom) * 0.15;
+            const rMargin = Math.max(baseMargin, 12 / camera.zoom);
             const squareSize = 8 / camera.zoom;
             
             // 1. Draw the main selection bounding box
@@ -393,6 +424,29 @@ const Canvas = () => {
               ctx.fill();
               ctx.stroke();
             });
+
+            // 3.5. Draw Rotation Handle
+            const rotationHandleDistance = 30 / camera.zoom;
+            const rotationHandleSize = 5 / camera.zoom;
+            const handleX = shape.x + shape.width / 2;
+            const handleY = shape.y - rotationHandleDistance;
+            
+            // Line from top edge to handle
+            ctx.beginPath();
+            ctx.moveTo(handleX, shape.y);
+            ctx.lineTo(handleX, handleY);
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 1.5 / camera.zoom;
+            ctx.stroke();
+            
+            // Circular rotation handle
+            ctx.beginPath();
+            ctx.arc(handleX, handleY, rotationHandleSize, 0, Math.PI * 2);
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 1.5 / camera.zoom;
+            ctx.fill();
+            ctx.stroke();
 
             // 4. Dimensions Label (Figma-style Blue Pill)
             const fontSize = 11 / camera.zoom;

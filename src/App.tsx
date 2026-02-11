@@ -16,11 +16,14 @@ function App() {
       {/* Main Container - Canvas must take remaining space */}
       <div className="flex-1 relative h-full">
         <Canvas />
-        <Toolbar />
       </div>
 
       {/* Right Sidebar - Properties */}
       <PropertySidebar />
+      
+      {/* Toolbar - Fixed at bottom */}
+      <Toolbar />
+      
       <DeletePageModal />
     </div>
   )

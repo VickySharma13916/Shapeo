@@ -1,0 +1,350 @@
+/* ============================================
+   FLUENT DESIGN SYSTEM
+   Microsoft Fluent Design inspired styling
+   ============================================ */
+
+/* CSS Custom Properties */
+:root {
+  /* Acrylic Material */
+  --fluent-acrylic-bg: rgba(44, 44, 44, 0.7);
+  --fluent-acrylic-tint: rgba(255, 255, 255, 0.03);
+  --fluent-acrylic-noise: rgba(255, 255, 255, 0.02);
+  --fluent-acrylic-blur: 40px;
+  --fluent-acrylic-blur-light: 20px;
+
+  /* Reveal Effect */
+  --fluent-reveal-border: rgba(255, 255, 255, 0.1);
+  --fluent-reveal-glow: rgba(255, 255, 255, 0.15);
+  --fluent-reveal-hover: rgba(255, 255, 255, 0.08);
+
+  /* Depth Shadows */
+  --fluent-shadow-4: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --fluent-shadow-8: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --fluent-shadow-16: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --fluent-shadow-32: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --fluent-shadow-64: 0 16px 64px rgba(0, 0, 0, 0.7);
+
+  /* Animation Curves */
+  --fluent-ease-in: cubic-bezier(0.7, 0, 1, 1);
+  --fluent-ease-out: cubic-bezier(0, 0, 0.3, 1);
+  --fluent-ease-in-out: cubic-bezier(0.65, 0.05, 0.36, 1);
+  --fluent-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Duration */
+  --fluent-duration-fast: 150ms;
+  --fluent-duration-normal: 250ms;
+  --fluent-duration-slow: 350ms;
+}
+
+/* ============================================
+   ACRYLIC MATERIAL
+   ============================================ */
+.fluent-acrylic {
+  background: var(--fluent-acrylic-bg);
+  backdrop-filter: blur(var(--fluent-acrylic-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--fluent-acrylic-blur)) saturate(150%);
+}
+
+.fluent-acrylic::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, var(--fluent-acrylic-tint) 0%, transparent 50%),
+    repeating-linear-gradient(
+      45deg,
+      var(--fluent-acrylic-noise) 0px,
+      transparent 1px,
+      transparent 2px,
+      var(--fluent-acrylic-noise) 3px
+    );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Light Acrylic Variant */
+.fluent-acrylic-light {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(var(--fluent-acrylic-blur-light));
+  -webkit-backdrop-filter: blur(var(--fluent-acrylic-blur-light));
+}
+
+/* ============================================
+   REVEAL EFFECT
+   ============================================ */
+.fluent-reveal {
+  position: relative;
+  transition: all var(--fluent-duration-normal) var(--fluent-ease-out);
+}
+
+.fluent-reveal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--fluent-reveal-border), transparent);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity var(--fluent-duration-normal) var(--fluent-ease-out);
+  pointer-events: none;
+}
+
+.fluent-reveal:hover::before {
+  opacity: 1;
+  background: linear-gradient(
+    135deg,
+    var(--fluent-reveal-glow),
+    var(--fluent-reveal-border)
+  );
+}
+
+.fluent-reveal:hover {
+  background-color: var(--fluent-reveal-hover);
+}
+
+/* Reveal for buttons */
+.fluent-reveal-button {
+  position: relative;
+  overflow: hidden;
+  transition: all var(--fluent-duration-normal) var(--fluent-ease-out);
+}
+
+.fluent-reveal-button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    var(--fluent-reveal-glow) 0%,
+    transparent 50%
+  );
+  opacity: 0;
+  transition: opacity var(--fluent-duration-fast) var(--fluent-ease-out);
+  pointer-events: none;
+}
+
+.fluent-reveal-button:hover::after {
+  opacity: 1;
+}
+
+/* ============================================
+   DEPTH SYSTEM
+   ============================================ */
+.fluent-depth-4 {
+  box-shadow: var(--fluent-shadow-4);
+}
+
+.fluent-depth-8 {
+  box-shadow: var(--fluent-shadow-8);
+}
+
+.fluent-depth-16 {
+  box-shadow: var(--fluent-shadow-16);
+}
+
+.fluent-depth-32 {
+  box-shadow: var(--fluent-shadow-32);
+}
+
+.fluent-depth-64 {
+  box-shadow: var(--fluent-shadow-64);
+}
+
+/* Glow Effects */
+.fluent-glow-blue {
+  box-shadow:
+    0 0 20px rgba(59, 130, 246, 0.3),
+    0 0 40px rgba(59, 130, 246, 0.15);
+}
+
+.fluent-glow-subtle {
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes fluent-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fluent-scale-in {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes fluent-slide-in {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fluent-reveal-border {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 100% 50%;
+  }
+}
+
+/* Animation Classes */
+.fluent-animate-in {
+  animation: fluent-scale-in var(--fluent-duration-normal)
+    var(--fluent-ease-out);
+}
+
+.fluent-animate-slide {
+  animation: fluent-slide-in var(--fluent-duration-normal)
+    var(--fluent-ease-out);
+}
+
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
+.fluent-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.fluent-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+
+.fluent-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  transition: background var(--fluent-duration-normal) var(--fluent-ease-out);
+}
+
+.fluent-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.fluent-scrollbar::-webkit-scrollbar-thumb:active {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Thin scrollbar variant */
+.fluent-scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+/* ============================================
+   INPUT FIELDS
+   ============================================ */
+.fluent-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all var(--fluent-duration-normal) var(--fluent-ease-out);
+}
+
+.fluent-input:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.fluent-input:focus {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  outline: none;
+}
+
+/* ============================================
+   BUTTONS
+   ============================================ */
+.fluent-button {
+  position: relative;
+  transition: all var(--fluent-duration-normal) var(--fluent-ease-out);
+  border: 1px solid transparent;
+}
+
+.fluent-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.fluent-button:active {
+  transform: translateY(0);
+}
+
+.fluent-button-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  box-shadow: var(--fluent-shadow-8);
+}
+
+.fluent-button-primary:hover {
+  box-shadow: var(--fluent-shadow-16), var(--fluent-glow-blue);
+}
+
+/* ============================================
+   DIVIDERS
+   ============================================ */
+.fluent-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+}
+
+.fluent-divider-vertical {
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+}
+
+/* ============================================
+   UTILITIES
+   ============================================ */
+.fluent-smooth {
+  transition: all var(--fluent-duration-normal) var(--fluent-ease-out);
+}
+
+.fluent-smooth-fast {
+  transition: all var(--fluent-duration-fast) var(--fluent-ease-out);
+}
+
+.fluent-smooth-slow {
+  transition: all var(--fluent-duration-slow) var(--fluent-ease-out);
+}
+
+/* Backdrop overlay for modals */
+.fluent-backdrop {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
