@@ -50,8 +50,6 @@ export function findSmartGuides(
 
   let closestXDist = Infinity;
   let closestYDist = Infinity;
-  let snapX: number | null = null;
-  let snapY: number | null = null;
   let guideX: AlignmentGuide | null = null;
   let guideY: AlignmentGuide | null = null;
 
@@ -76,7 +74,6 @@ export function findSmartGuides(
       const dist = Math.abs(primaryVal - otherVal);
       if (dist < closestXDist && dist <= snapThreshold) {
         closestXDist = dist;
-        snapX = otherVal;
         snapOffsetX = otherVal - primaryVal;
         guideX = {
           axis: 'x',
@@ -104,7 +101,6 @@ export function findSmartGuides(
       const dist = Math.abs(primaryVal - otherVal);
       if (dist < closestYDist && dist <= snapThreshold) {
         closestYDist = dist;
-        snapY = otherVal;
         snapOffsetY = otherVal - primaryVal;
         guideY = {
           axis: 'y',
