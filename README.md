@@ -1,73 +1,63 @@
-# React + TypeScript + Vite
+# Shapeo (Mini-Figma)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A powerful, web-based vector design tool inspired by Figma. Shapeo allows you to create, edit, and manage vector graphics, images, and multiple pages with an intuitive interface.
 
-Currently, two official plugins are available:
+## 🚀 Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Infinite Canvas**: Pan and zoom freely to navigate your workspace.
+- **Vector Shapes**: Create Rectangles, Ellipses, Lines, and more with customizable properties (fill, stroke, rotation).
+- **Image Support**: Upload and manipulate images directly on the canvas.
+- **Multi-Page Support**: Organize your designs across multiple pages.
+- **Layer Management**: Control z-index with Bring to Front, Send to Back, etc.
+- **Alignment Tools**: Easily align objects (Left, Center, Right, Top, Middle, Bottom).
+- **History System**: Robust Undo/Redo functionality.
+- **Clipboard Operations**: Copy, Cut, and Paste shapes between pages or positions.
+- **Fluent Design**: A modern, polished UI inspired by Microsoft's Fluent Design System.
+- **Persistent State**: Your work is automatically saved to local storage.
 
-## React Compiler
+## 🛠️ Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Framework**: [React 19](https://react.dev/)
+- **Build Tool**: [Vite](https://vitejs.dev/)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **State Management**: [Zustand](https://github.com/pmndrs/zustand)
+- **Styling**: [TailwindCSS](https://tailwindcss.com/) & Custom Fluent Design
+- **Icons**: [Lucide React](https://lucide.dev/)
 
-## Expanding the ESLint configuration
+## 📦 Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. **Clone the repository**
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+   ```bash
+   git clone git@github.com:VickySharma13916/Shapeo.git
+   cd mini-figma
+   ```
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+2. **Install dependencies**
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+   ```bash
+   npm install
+   ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+3. **Start the development server**
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+   ```bash
+   npm run dev
+   ```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+4. **Build for production**
+   ```bash
+   npm run build
+   ```
+
+## 🎨 Controls
+
+- **Select**: Click to select objects. hold `Shift` to multi-select.
+- **Pan**: Hold `Space` and drag, or use scroll wheel.
+- **Zoom**: `Ctrl/Cmd` + Scroll.
+- **Delete**: `Delete` or `Backspace` key.
+- **Undo/Redo**: `Ctrl+Z` / `Ctrl+Shift+Z` (or `Cmd+Z` / `Cmd+Shift+Z`).
+
+## 🤝 Contributing
+
+Contributions are welcome! Feel free to open issues or submit pull requests.

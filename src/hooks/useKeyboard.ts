@@ -11,7 +11,6 @@ export const useKeyboard = () => {
   useEffect(() => {
     const currentPageShapes = pages.find(p => p.id === currentPageId)?.shapes || [];
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (selectedIds.length === 0) return;
       // Don't trigger shortcuts if the user is typing in a sidebar input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
@@ -23,7 +22,7 @@ export const useKeyboard = () => {
       const step = e.shiftKey ? 10 : 1;
 
       // --- CLIPBOARD ACTIONS ---
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      if (selectedIds.length > 0 && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault();
         
         selectedIds.forEach(id => {
@@ -81,11 +80,9 @@ export const useKeyboard = () => {
       }
 
       // Delete: Backspace or Delete
-      if (key === 'backspace' || key === 'delete') {
-        if (selectedIds.length > 0) {
-          e.preventDefault();
-          deleteShapes();
-        }
+      if ((key === 'backspace' || key === 'delete') && selectedIds.length > 0) {
+        e.preventDefault();
+        deleteShapes();
       }
 
       // --- TOOL SWITCHING (Figma Style) ---
