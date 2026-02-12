@@ -31,6 +31,18 @@ export const getRotationHandleAtPos = (worldPos: Point, shape: Shape, zoom: numb
 // Helper to detect handles at the corners of the shape
 export const getHandleAtPos = (worldPos: { x: number; y: number }, shape: Shape, zoom: number) => {
   const handleSize = 10 / zoom;
+  
+  if (shape.type === 'line') {
+    const handles = [
+      { id: 'start', x: shape.x, y: shape.y },
+      { id: 'end', x: shape.x2, y: shape.y2 },
+    ];
+    return handles.find(h => 
+      Math.abs(worldPos.x - h.x) <= handleSize/2 &&
+      Math.abs(worldPos.y - h.y) <= handleSize/2
+    );
+  }
+
   const handles = [
     { id: 'nw', x: shape.x, y: shape.y },
     { id: 'ne', x: shape.x + shape.width, y: shape.y },

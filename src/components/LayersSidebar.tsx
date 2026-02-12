@@ -106,14 +106,20 @@ const LayersSidebar = () => {
                   className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs cursor-pointer fluent-smooth ${
                     selectedIds.includes(shape.id) ? 'bg-blue-600 text-white fluent-depth-8 fluent-glow-blue' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200 fluent-reveal'
                   }`}>
-                  {shape.type === 'image' ? <ImageIcon size={12} className="opacity-70" /> : <Layout size={12} className="opacity-70" />}
-                  <span className="truncate flex-1">
-                    {shape.type === 'image' ? 'Image' : shape.type === 'rect' ? 'Rectangle' : 'Circle'}
-                    <span className="ml-1 opacity-40 font-mono text-[10px]">{shape.id.substring(0,3)}</span>
+                  {shape.type === 'image' ? <ImageIcon size={12} className="opacity-70" /> : 
+                   shape.type === 'line' ? <div className="w-3 h-3 border-b-2 border-current opacity-70 rotate-45" /> :
+                   <Layout size={12} className="opacity-70" />}
+                  <span className="truncate flex-1 text-[11px]">
+                    {shape.type === 'image' ? 'Image' : 
+                     shape.type === 'rect' ? 'Rectangle' : 
+                     shape.type === 'circle' ? 'Circle' : 
+                     shape.type === 'ellipse' ? 'Ellipse' : 'Line'}
+                    <span className="ml-1 opacity-40 font-mono text-[9px] uppercase">{shape.id.substring(0,3)}</span>
                   </span>
                 </div>
               ))}
             </div>
+
           )}
         </div>
       </div>

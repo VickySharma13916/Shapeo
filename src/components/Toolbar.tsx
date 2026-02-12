@@ -1,10 +1,13 @@
 'use client';
-import { Hand, MousePointer2, Plus, RotateCcw, RotateCw, SquareDashed, Trash2 } from 'lucide-react';
-import { ShapeType } from '../engine/types';
+import { Hand, MousePointer2, RotateCcw, RotateCw, SquareDashed, Trash2, Square, Minus, Circle } from 'lucide-react';
+import { ShapeType, type ShapeType as ShapeTypeType } from '../engine/types';
 import { useStore } from '../store/useStore';
+import ToolbarDropdown, { type ToolOption } from './ToolbarDropdown';
+import { useState } from 'react';
 
 const Toolbar = () => {
   const { addShape, selectedIds, setSelectedIds, pages, currentPageId, deleteShapes, mode, setMode, undo, redo, deleteImage } = useStore();
+  const [activeShapeTool, setActiveShapeTool] = useState<ShapeTypeType>(ShapeType.Rectangle);
 
   // FIX: Derive shapes from the active page so Select All works correctly
   const currentPage = pages.find(p => p.id === currentPageId);
@@ -14,6 +17,40 @@ const Toolbar = () => {
     const allIds = currentShapes.map(s => s.id);
     setSelectedIds(allIds);
   };
+
+  // Shape tool options for dropdown
+  const shapeOptions: ToolOption[] = [
+    {
+      id: ShapeType.Rectangle,
+      label: 'Rectangle',
+      icon: <Square size={18} />,
+      shortcut: 'R',
+      action: () => {
+        setActiveShapeTool(ShapeType.Rectangle);
+        addShape(ShapeType.Rectangle);
+      },
+    },
+    {
+      id: ShapeType.Line,
+      label: 'Line',
+      icon: <Minus size={18} />,
+      shortcut: 'L',
+      action: () => {
+        setActiveShapeTool(ShapeType.Line);
+        addShape(ShapeType.Line);
+      },
+    },
+    {
+      id: ShapeType.Ellipse,
+      label: 'Ellipse',
+      icon: <Circle size={18} />,
+      shortcut: 'O',
+      action: () => {
+        setActiveShapeTool(ShapeType.Ellipse);
+        addShape(ShapeType.Ellipse);
+      },
+    },
+  ];
 
   return (
     <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2 fluent-acrylic border border-white/10 rounded-2xl fluent-depth-32 z-50">
@@ -67,14 +104,11 @@ const Toolbar = () => {
         <SquareDashed size={18} />
       </button>
 
-      {/* Add Shape */}
-      <button 
-        onClick={() => addShape(ShapeType.Rectangle)} 
-        className="p-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white fluent-button-primary fluent-smooth shadow-lg active:scale-95 cursor-pointer"
-        title="Add Rectangle (R)"
-      >
-        <Plus size={20} />
-      </button>
+      {/* Shape Dropdown */}
+      <ToolbarDropdown
+        options={shapeOptions}
+        activeToolId={activeShapeTool}
+      />
       
       {/* Delete Selection */}
       <button 

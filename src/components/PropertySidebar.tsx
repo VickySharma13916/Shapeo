@@ -1,5 +1,10 @@
 import React from 'react';
-import { ChevronDown, Download, ZoomIn, ZoomOut, PanelRight, Target, Droplet, Square, Home, RotateCw, ChevronsUp, ChevronUp, ChevronDown as ChevronDownIcon, ChevronsDown } from 'lucide-react';
+import { 
+  ChevronDown, Download, ZoomIn, ZoomOut, PanelRight, Target, Droplet, Square, Home, RotateCw, 
+  ChevronsUp, ChevronUp, ChevronDown as ChevronDownIcon, ChevronsDown,
+  AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical,
+  Link, Unlink, Box
+} from 'lucide-react';
 
 import { useStore } from '../store/useStore';
 
@@ -17,7 +22,12 @@ const SidebarSection = ({ title, children, icon }: { title: string, children: Re
 );
 
 export default function PropertySidebar() {
-  const { pages, currentPageId, selectedIds, updateShape, saveHistory, camera, setCamera, zoomIn, zoomOut, centerObject, rightSidebarVisible, toggleRightSidebar, bringToFront, sendToBack, moveForward, moveBackward } = useStore();
+  const { 
+    pages, currentPageId, selectedIds, updateShape, saveHistory, camera, setCamera, 
+    zoomIn, zoomOut, centerObject, rightSidebarVisible, toggleRightSidebar, 
+    bringToFront, sendToBack, moveForward, moveBackward, alignLeft, alignCenter, 
+    alignRight, alignTop, alignMiddle, alignBottom, toggleAspectRatioLock
+  } = useStore();
 
   const currentPage = pages.find(p => p.id === currentPageId);
   const shapes = currentPage?.shapes || [];
@@ -185,55 +195,222 @@ export default function PropertySidebar() {
             </div>
           </SidebarSection>
 
+          {/* 3. ALIGNMENT (MULTI-SELECT ONLY) */}
+          {selectedIds.length >= 2 && (
+            <SidebarSection title="Align">
+              <div className="space-y-2">
+                {/* Horizontal Alignment */}
+                <div className="grid grid-cols-3 gap-2">
+                  <button 
+                    onClick={alignLeft}
+                    className="flex flex-col items-center justify-center bg-zinc-800/40 px-2 py-2.5 rounded-md border border-zinc-700/50 hover:border-blue-500 hover:bg-zinc-800/60 fluent-smooth fluent-reveal cursor-pointer"
+                    title="Align left edges"
+                  >
+                    <AlignLeft size={16} className="text-zinc-400" />
+                    <span className="text-[9px] text-zinc-500 mt-0.5 font-semibold">Left</span>
+                  </button>
+                  <button 
+                    onClick={alignCenter}
+                    className="flex flex-col items-center justify-center bg-zinc-800/40 px-2 py-2.5 rounded-md border border-zinc-700/50 hover:border-blue-500 hover:bg-zinc-800/60 fluent-smooth fluent-reveal cursor-pointer"
+                    title="Align horizontal centers"
+                  >
+                    <AlignCenter size={16} className="text-zinc-400" />
+                    <span className="text-[9px] text-zinc-500 mt-0.5 font-semibold">Center</span>
+                  </button>
+                  <button 
+                    onClick={alignRight}
+                    className="flex flex-col items-center justify-center bg-zinc-800/40 px-2 py-2.5 rounded-md border border-zinc-700/50 hover:border-blue-500 hover:bg-zinc-800/60 fluent-smooth fluent-reveal cursor-pointer"
+                    title="Align right edges"
+                  >
+                    <AlignRight size={16} className="text-zinc-400" />
+                    <span className="text-[9px] text-zinc-500 mt-0.5 font-semibold">Right</span>
+                  </button>
+                </div>
+                {/* Vertical Alignment */}
+                <div className="grid grid-cols-3 gap-2">
+                  <button 
+                    onClick={alignTop}
+                    className="flex flex-col items-center justify-center bg-zinc-800/40 px-2 py-2.5 rounded-md border border-zinc-700/50 hover:border-blue-500 hover:bg-zinc-800/60 fluent-smooth fluent-reveal cursor-pointer"
+                    title="Align top edges"
+                  >
+                    <AlignStartVertical size={16} className="text-zinc-400" />
+                    <span className="text-[9px] text-zinc-500 mt-0.5 font-semibold">Top</span>
+                  </button>
+                  <button 
+                    onClick={alignMiddle}
+                    className="flex flex-col items-center justify-center bg-zinc-800/40 px-2 py-2.5 rounded-md border border-zinc-700/50 hover:border-blue-500 hover:bg-zinc-800/60 fluent-smooth fluent-reveal cursor-pointer"
+                    title="Align vertical centers"
+                  >
+                    <AlignCenterVertical size={16} className="text-zinc-400" />
+                    <span className="text-[9px] text-zinc-500 mt-0.5 font-semibold">Middle</span>
+                  </button>
+                  <button 
+                    onClick={alignBottom}
+                    className="flex flex-col items-center justify-center bg-zinc-800/40 px-2 py-2.5 rounded-md border border-zinc-700/50 hover:border-blue-500 hover:bg-zinc-800/60 fluent-smooth fluent-reveal cursor-pointer"
+                    title="Align bottom edges"
+                  >
+                    <AlignEndVertical size={16} className="text-zinc-400" />
+                    <span className="text-[9px] text-zinc-500 mt-0.5 font-semibold">Bottom</span>
+                  </button>
+                </div>
+              </div>
+            </SidebarSection>
+          )}
+
           {/* 3. TRANSFORMATION */}
           <SidebarSection title="Transform">
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: 'X', value: firstShape.x, key: 'x' },
-                { label: 'Y', value: firstShape.y, key: 'y' },
-                { label: 'W', value: firstShape.width, key: 'width' },
-                { label: 'H', value: firstShape.height, key: 'height' },
-              ].map((prop) => {
-                const displayValue = localValues[prop.key] !== undefined ? localValues[prop.key] : Math.round(prop.value);
-                return (
-                  <div key={prop.label} className="flex items-center gap-2 bg-zinc-800/40 px-2 py-2 rounded-md border border-zinc-700/50 focus-within:border-blue-500 focus-within:bg-zinc-800/60 fluent-smooth fluent-input hover:border-zinc-600/50">
-                    <span 
-                      className="text-zinc-500 font-semibold text-[10px] w-3 uppercase cursor-ew-resize hover:text-blue-400 select-none transition-colors"
-                      onMouseDown={(e) => handleLabelMouseDown(e, prop.key, prop.value)}
-                      title={`Drag to scrub ${prop.label}`}
-                    >
-                      {prop.label}
-                    </span>
-                    <input 
-                      className="bg-transparent w-full outline-none text-white text-xs font-mono tabular-nums" 
-                      type="number"
-                      value={displayValue}
-                      onFocus={() => setLocalValues({ ...localValues, [prop.key]: Math.round(prop.value) })}
-                      onBlur={() => {
-                        setLocalValues({});
-                        handleCommit();
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.currentTarget.blur();
-                        } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                          e.preventDefault();
-                          const step = e.shiftKey ? 10 : 1;
-                          const current = prop.value;
-                          const newValue = e.key === 'ArrowUp' ? current + step : Math.max(0, current - step);
-                          handleBulkUpdate({ [prop.key]: newValue }, true);
+            <div className="space-y-2">
+              {/* X and Y - First Row */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: 'X', value: firstShape.x, key: 'x' },
+                  { label: 'Y', value: firstShape.y, key: 'y' },
+                ].map((prop) => {
+                  const displayValue = localValues[prop.key] !== undefined ? localValues[prop.key] : Math.round(prop.value);
+                  return (
+                    <div key={prop.label} className="flex items-center gap-2 bg-zinc-800/40 px-2 py-2 rounded-md border border-zinc-700/50 focus-within:border-blue-500 focus-within:bg-zinc-800/60 fluent-smooth fluent-input hover:border-zinc-600/50">
+                      <span 
+                        className="text-zinc-500 font-semibold text-[10px] w-3 uppercase cursor-ew-resize hover:text-blue-400 select-none transition-colors"
+                        onMouseDown={(e) => handleLabelMouseDown(e, prop.key, prop.value)}
+                        title={`Drag to scrub ${prop.label}`}
+                      >
+                        {prop.label}
+                      </span>
+                      <input 
+                        className="bg-transparent w-full outline-none text-white text-xs font-mono tabular-nums" 
+                        type="number"
+                        value={displayValue}
+                        onFocus={() => setLocalValues({ ...localValues, [prop.key]: Math.round(prop.value) })}
+                        onBlur={() => {
+                          setLocalValues({});
+                          handleCommit();
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.currentTarget.blur();
+                          } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            const step = e.shiftKey ? 10 : 1;
+                            const current = prop.value;
+                            const newValue = e.key === 'ArrowUp' ? current + step : Math.max(0, current - step);
+                            handleBulkUpdate({ [prop.key]: newValue }, true);
+                            setLocalValues({ ...localValues, [prop.key]: newValue });
+                          }
+                        }}
+                        onChange={(e) => {
+                          const newValue = parseInt(e.target.value) || 0;
                           setLocalValues({ ...localValues, [prop.key]: newValue });
-                        }
-                      }}
-                      onChange={(e) => {
-                        const newValue = parseInt(e.target.value) || 0;
-                        setLocalValues({ ...localValues, [prop.key]: newValue });
-                        handleBulkUpdate({ [prop.key]: newValue });
-                      }}
-                    />
-                  </div>
-                );
-              })}
+                          handleBulkUpdate({ [prop.key]: newValue });
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* W and H with Lock Button - Second Row */}
+              <div className="flex items-center gap-2">
+                {/* Width Input */}
+                {(() => {
+                  const prop = { label: 'W', value: firstShape.width, key: 'width' };
+                  const displayValue = localValues[prop.key] !== undefined ? localValues[prop.key] : Math.round(prop.value);
+                  return (
+                    <div className="flex-1 flex items-center gap-2 bg-zinc-800/40 px-2 py-2 rounded-md border border-zinc-700/50 focus-within:border-blue-500 focus-within:bg-zinc-800/60 fluent-smooth fluent-input hover:border-zinc-600/50">
+                      <span 
+                        className="text-zinc-500 font-semibold text-[10px] w-3 uppercase cursor-ew-resize hover:text-blue-400 select-none transition-colors"
+                        onMouseDown={(e) => handleLabelMouseDown(e, prop.key, prop.value)}
+                        title={`Drag to scrub ${prop.label}`}
+                      >
+                        {prop.label}
+                      </span>
+                      <input 
+                        className="bg-transparent w-full outline-none text-white text-xs font-mono tabular-nums" 
+                        type="number"
+                        value={displayValue}
+                        onFocus={() => setLocalValues({ ...localValues, [prop.key]: Math.round(prop.value) })}
+                        onBlur={() => {
+                          setLocalValues({});
+                          handleCommit();
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.currentTarget.blur();
+                          } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            const step = e.shiftKey ? 10 : 1;
+                            const current = prop.value;
+                            const newValue = e.key === 'ArrowUp' ? current + step : Math.max(1, current - step);
+                            handleBulkUpdate({ [prop.key]: newValue }, true);
+                            setLocalValues({ ...localValues, [prop.key]: newValue });
+                          }
+                        }}
+                        onChange={(e) => {
+                          const newValue = parseInt(e.target.value) || 1;
+                          setLocalValues({ ...localValues, [prop.key]: newValue });
+                          handleBulkUpdate({ [prop.key]: newValue });
+                        }}
+                      />
+                    </div>
+                  );
+                })()}
+
+                {/* Aspect Ratio Lock Button */}
+                <button
+                  onClick={() => toggleAspectRatioLock(firstShape.id)}
+                  className={`p-2 rounded-md border transition-all fluent-smooth ${
+                    firstShape.aspectRatioLocked
+                      ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                      : 'bg-zinc-800/40 border-zinc-700/50 text-zinc-500 hover:border-zinc-600 hover:text-zinc-400'
+                  }`}
+                  title={firstShape.aspectRatioLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+                >
+                  {firstShape.aspectRatioLocked ? <Link size={14} /> : <Unlink size={14} />}
+                </button>
+
+                {/* Height Input */}
+                {(() => {
+                  const prop = { label: 'H', value: firstShape.height, key: 'height' };
+                  const displayValue = localValues[prop.key] !== undefined ? localValues[prop.key] : Math.round(prop.value);
+                  return (
+                    <div className="flex-1 flex items-center gap-2 bg-zinc-800/40 px-2 py-2 rounded-md border border-zinc-700/50 focus-within:border-blue-500 focus-within:bg-zinc-800/60 fluent-smooth fluent-input hover:border-zinc-600/50">
+                      <span 
+                        className="text-zinc-500 font-semibold text-[10px] w-3 uppercase cursor-ew-resize hover:text-blue-400 select-none transition-colors"
+                        onMouseDown={(e) => handleLabelMouseDown(e, prop.key, prop.value)}
+                        title={`Drag to scrub ${prop.label}`}
+                      >
+                        {prop.label}
+                      </span>
+                      <input 
+                        className="bg-transparent w-full outline-none text-white text-xs font-mono tabular-nums" 
+                        type="number"
+                        value={displayValue}
+                        onFocus={() => setLocalValues({ ...localValues, [prop.key]: Math.round(prop.value) })}
+                        onBlur={() => {
+                          setLocalValues({});
+                          handleCommit();
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.currentTarget.blur();
+                          } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            const step = e.shiftKey ? 10 : 1;
+                            const current = prop.value;
+                            const newValue = e.key === 'ArrowUp' ? current + step : Math.max(1, current - step);
+                            handleBulkUpdate({ [prop.key]: newValue }, true);
+                            setLocalValues({ ...localValues, [prop.key]: newValue });
+                          }
+                        }}
+                        onChange={(e) => {
+                          const newValue = parseInt(e.target.value) || 1;
+                          setLocalValues({ ...localValues, [prop.key]: newValue });
+                          handleBulkUpdate({ [prop.key]: newValue });
+                        }}
+                      />
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           </SidebarSection>
 
@@ -295,6 +472,104 @@ export default function PropertySidebar() {
                 />
                 <span className="text-zinc-500 text-[10px]">deg</span>
               </div>
+            </div>
+          </SidebarSection>
+
+          {/* 4.5 SHADOW */}
+          <SidebarSection title="Shadow">
+            <div className="space-y-2">
+              {/* Shadow Enable/Disable Toggle */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Box size={13} className="text-zinc-500" />
+                  <span className="text-zinc-400 text-[10px] font-semibold">Drop Shadow</span>
+                </div>
+                <button
+                  onClick={() => {
+                    const currentShadow = firstShape.shadow || { color: '#000000', blur: 10, x: 0, y: 4, enabled: false };
+                    handleBulkUpdate({ shadow: { ...currentShadow, enabled: !currentShadow.enabled } }, true);
+                  }}
+                  className={`px-3 py-1 rounded text-[10px] font-semibold transition-all ${
+                    firstShape.shadow?.enabled
+                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500'
+                      : 'bg-zinc-800/40 text-zinc-500 border border-zinc-700/50 hover:border-zinc-600'
+                  }`}
+                >
+                  {firstShape.shadow?.enabled ? 'ON' : 'OFF'}
+                </button>
+              </div>
+
+              {/* Shadow Controls (only visible when enabled) */}
+              {firstShape.shadow?.enabled && (
+                <div className="space-y-2 pl-5 border-l-2 border-zinc-700/30">
+                  {/* Shadow Color */}
+                  <div className="flex items-center gap-2 bg-zinc-800/40 px-2 py-2 rounded-md border border-zinc-700/50 hover:bg-zinc-800/60 hover:border-zinc-600/50 fluent-smooth">
+                    <div className="relative w-5 h-5 rounded overflow-hidden border border-zinc-700/70">
+                      <input 
+                        type="color" 
+                        value={firstShape.shadow.color}
+                        onBlur={handleCommit}
+                        onChange={(e) => {
+                          const currentShadow = firstShape.shadow || { color: '#000000', blur: 10, x: 0, y: 4, enabled: true };
+                          handleBulkUpdate({ shadow: { ...currentShadow, color: e.target.value } });
+                        }}
+                        className="absolute -inset-1 cursor-pointer w-[150%] h-[150%]"
+                      />
+                    </div>
+                    <span className="text-zinc-300 text-[10px] font-mono uppercase">{firstShape.shadow.color}</span>
+                  </div>
+
+                  {/* Shadow Blur */}
+                  <div className="flex items-center gap-2 bg-zinc-800/40 px-2 py-2 rounded-md border border-zinc-700/50 focus-within:border-blue-500 focus-within:bg-zinc-800/60 fluent-smooth hover:border-zinc-600/50">
+                    <span className="text-zinc-400 text-[10px] font-semibold w-8">Blur</span>
+                    <input 
+                      className="bg-transparent w-full outline-none text-white text-xs font-mono tabular-nums" 
+                      type="number"
+                      min="0"
+                      value={firstShape.shadow.blur}
+                      onBlur={handleCommit}
+                      onChange={(e) => {
+                        const currentShadow = firstShape.shadow || { color: '#000000', blur: 10, x: 0, y: 4, enabled: true };
+                        handleBulkUpdate({ shadow: { ...currentShadow, blur: parseInt(e.target.value) || 0 } });
+                      }}
+                    />
+                    <span className="text-zinc-500 text-[10px]">px</span>
+                  </div>
+
+                  {/* Shadow Offset X and Y */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Offset X */}
+                    <div className="flex items-center gap-2 bg-zinc-800/40 px-2 py-2 rounded-md border border-zinc-700/50 focus-within:border-blue-500 focus-within:bg-zinc-800/60 fluent-smooth hover:border-zinc-600/50">
+                      <span className="text-zinc-400 text-[10px] font-semibold w-3">X</span>
+                      <input 
+                        className="bg-transparent w-full outline-none text-white text-xs font-mono tabular-nums" 
+                        type="number"
+                        value={firstShape.shadow.x}
+                        onBlur={handleCommit}
+                        onChange={(e) => {
+                          const currentShadow = firstShape.shadow || { color: '#000000', blur: 10, x: 0, y: 4, enabled: true };
+                          handleBulkUpdate({ shadow: { ...currentShadow, x: parseInt(e.target.value) || 0 } });
+                        }}
+                      />
+                    </div>
+
+                    {/* Offset Y */}
+                    <div className="flex items-center gap-2 bg-zinc-800/40 px-2 py-2 rounded-md border border-zinc-700/50 focus-within:border-blue-500 focus-within:bg-zinc-800/60 fluent-smooth hover:border-zinc-600/50">
+                      <span className="text-zinc-400 text-[10px] font-semibold w-3">Y</span>
+                      <input 
+                        className="bg-transparent w-full outline-none text-white text-xs font-mono tabular-nums" 
+                        type="number"
+                        value={firstShape.shadow.y}
+                        onBlur={handleCommit}
+                        onChange={(e) => {
+                          const currentShadow = firstShape.shadow || { color: '#000000', blur: 10, x: 0, y: 4, enabled: true };
+                          handleBulkUpdate({ shadow: { ...currentShadow, y: parseInt(e.target.value) || 0 } });
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </SidebarSection>
 

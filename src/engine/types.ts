@@ -12,6 +12,8 @@ export type Camera = {
 export const ShapeType = {
   Rectangle: 'rect',
   Circle: 'circle',
+  Line: 'line',
+  Ellipse: 'ellipse',
   Image: 'image',
 } as const;
 
@@ -34,6 +36,7 @@ export interface BaseShape {
   rotation: number;
   opacity?: number;
   cornerRadius?: number;
+  aspectRatioLocked?: boolean;
   shadow?: {
     color: string;
     blur: number;
@@ -57,7 +60,21 @@ export interface ImageShape extends BaseShape {
   imageElement?: HTMLImageElement;
 }
 
-export type Shape = RectShape | CircleShape | ImageShape;
+export interface LineShape extends BaseShape {
+  type: 'line';
+  x2: number;
+  y2: number;
+  lineCap?: 'butt' | 'round' | 'square';
+}
+
+export interface EllipseShape extends BaseShape {
+  type: 'ellipse';
+  rx: number;
+  ry: number;
+}
+
+export type Shape = RectShape | CircleShape | ImageShape | LineShape | EllipseShape;
+
 
 export type Handle = 'nw' | 'n' | 'ne' | 'w' | 'e' | 'sw' | 's' | 'se';
 

@@ -8,6 +8,7 @@ import { GRID_SIZE, MIN_SIZE } from '../utils/Common';
 
 import { screenToWorld, isPointInShape } from '../engine/utils';
 import type { Point } from '../engine/types';
+import { findSmartGuides, drawSmartGuides, type AlignmentGuide } from '../engine/smartGuides';
 
 import { getEdgeHandleAtPos, getHandleAtPos, getRadiusHandleAtPos, getRotationHandleAtPos } from '../utils/CommonFunctions';
 
@@ -23,6 +24,7 @@ const Canvas = () => {
   
   const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
   const [marqueeRect, setMarqueeRect] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
+  const [smartGuides, setSmartGuides] = useState<AlignmentGuide[]>([]);
 
   const snap = (val: number) => Math.round(val / GRID_SIZE) * GRID_SIZE;
 
@@ -217,23 +219,106 @@ const Canvas = () => {
     if (activeHandleRef.current && selectedIds.length === 1) {
       const shape = shapes.find(s => s.id === selectedIds[0]);
       if (!shape) return;
+      
+      if (shape.type === 'line') {
+        if (activeHandleRef.current === 'start') {
+          updateShape(shape.id, { x: snap(worldPos.x), y: snap(worldPos.y) });
+        } else if (activeHandleRef.current === 'end') {
+          updateShape((shape as any).id, { x2: snap(worldPos.x), y2: snap(worldPos.y) });
+        }
+        return;
+      }
+
       let { x, y, width, height } = shape;
+      const aspectRatio = shape.width / shape.height;
+      
+      // Calculate new dimensions based on handle
       if (activeHandleRef.current.includes('e')) width = Math.max(MIN_SIZE, worldPos.x - shape.x);
       if (activeHandleRef.current.includes('w')) { x = worldPos.x; width = shape.x + shape.width - worldPos.x; }
       if (activeHandleRef.current.includes('s')) height = Math.max(MIN_SIZE, worldPos.y - shape.y);
       if (activeHandleRef.current.includes('n')) { y = worldPos.y; height = shape.y + shape.height - worldPos.y; }
+      
+      // Apply aspect ratio constraint if locked
+
+      if (shape.aspectRatioLocked) {
+        const handle = activeHandleRef.current;
+        
+        // Corner handles: use both dimensions, prefer the larger change
+        if (handle.length === 2) { // Corner handles like 'ne', 'se', 'sw', 'nw'
+          const widthChange = Math.abs(width - shape.width);
+          const heightChange = Math.abs(height - shape.height);
+          
+          if (widthChange > heightChange) {
+            // Width changed more, adjust height
+            const newHeight = width / aspectRatio;
+            if (handle.includes('n')) {
+              y = shape.y + shape.height - newHeight;
+            }
+            height = newHeight;
+          } else {
+            // Height changed more, adjust width
+            const newWidth = height * aspectRatio;
+            if (handle.includes('w')) {
+              x = shape.x + shape.width - newWidth;
+            }
+            width = newWidth;
+          }
+        } else {
+          // Edge handles: adjust the other dimension
+          if (handle.includes('e') || handle.includes('w')) {
+            // Horizontal edge: adjust height
+            const newHeight = width / aspectRatio;
+            height = newHeight;
+          } else if (handle.includes('n') || handle.includes('s')) {
+            // Vertical edge: adjust width
+            const newWidth = height * aspectRatio;
+            width = newWidth;
+          }
+        }
+      }
+      
       updateShape(selectedIds[0], { x, y, width, height });
       return;
     }
 
-    // Handle Dragging
+    // Handle Dragging with Smart Guides
     if (isDraggingRef.current) {
-      selectedIds.forEach(id => {
-        const offset = dragOffset.current[id];
+      const draggedShapes = shapes.filter(s => selectedIds.includes(s.id));
+      
+     if (draggedShapes.length > 0) {
+        // Calculate potential new positions
+        const primaryShape = draggedShapes[0];
+        const offset = dragOffset.current[primaryShape.id];
+        
         if (offset) {
-          updateShape(id, { x: snap(worldPos.x - offset.x), y: snap(worldPos.y - offset.y) });
+          const baseX = worldPos.x - offset.x;
+          const baseY = worldPos.y - offset.y;
+          
+          // Create temporary shapes at new positions for snap detection
+          const tempShapes = draggedShapes.map(shape => ({
+            ...shape,
+            x: shape === primaryShape ? baseX : shape.x + (baseX - primaryShape.x),
+            y: shape === primaryShape ? baseY : shape.y + (baseY - primaryShape.y),
+          }));
+          
+          // Find smart guides and snap offset
+          const { guides, snapOffset } = findSmartGuides(tempShapes, shapes);
+          
+          // Apply positions with snap offset
+          selectedIds.forEach(id => {
+            const shape = shapes.find(s => s.id === id);
+            const dragOffset_val = dragOffset.current[id];
+            if (dragOffset_val && shape) {
+              const newX = worldPos.x - dragOffset_val.x + snapOffset.x;
+              const newY = worldPos.y - dragOffset_val.y + snapOffset.y;
+              updateShape(id, { x: snap(newX), y: snap(newY) });
+            }
+          });
+          
+          // Update smart guides display
+          setSmartGuides(guides);
         }
-      });
+      }
     }
   };
 
@@ -248,6 +333,7 @@ const Canvas = () => {
     isDraggingCanvasRef.current = false;
     marqueeStartRef.current = null;
     setMarqueeRect(null);
+    setSmartGuides([]); // Clear smart guides
     dragOffset.current = {};
   };
 
@@ -309,40 +395,69 @@ const Canvas = () => {
         }
 
         ctx.beginPath();
-        const radius = shape.cornerRadius ?? 0;
-        if (radius > 0) ctx.roundRect(shape.x, shape.y, shape.width, shape.height, radius);
-        else ctx.rect(shape.x, shape.y, shape.width, shape.height);
-
-        if (shape.type === 'image') {
-          // Check if we need to load the image into a cached element
-          if (!shape.imageElement && shape.src) {
-            const img = new Image();
-            img.src = shape.src;
-            img.onload = () => {
-              shape.imageElement = img;
-              // No extra logic needed, the next frame will pick up the element
-            };
+        
+        // Shape-specific rendering
+        if (shape.type === 'line') {
+          ctx.moveTo(shape.x, shape.y);
+          ctx.lineTo(shape.x2, shape.y2);
+          if (shape.lineCap) ctx.lineCap = shape.lineCap;
+          
+          if (shape.strokeWidth > 0) {
+            ctx.strokeStyle = shape.stroke;
+            ctx.lineWidth = shape.strokeWidth;
+            ctx.stroke();
           }
-
-          const imgElement = shape.imageElement;
-          if (imgElement instanceof HTMLImageElement && imgElement.complete) {
-            ctx.save();
-            ctx.clip();
-            ctx.drawImage(imgElement, shape.x, shape.y, shape.width, shape.height);
-            ctx.restore();
-          } else {
-            ctx.fillStyle = '#1a1a1a'; 
-            ctx.fill();
+        } else if (shape.type === 'circle' || shape.type === 'ellipse') {
+          const centerX = shape.x + shape.width / 2;
+          const centerY = shape.y + shape.height / 2;
+          const rx = Math.abs(shape.width / 2);
+          const ry = Math.abs(shape.height / 2);
+          
+          ctx.ellipse(centerX, centerY, rx, ry, 0, 0, Math.PI * 2);
+          ctx.fillStyle = shape.fill;
+          ctx.fill();
+          
+          if (shape.strokeWidth > 0) {
+            ctx.strokeStyle = shape.stroke;
+            ctx.lineWidth = shape.strokeWidth;
+            ctx.stroke();
           }
         } else {
-          ctx.fillStyle = shape.fill; ctx.fill();
+          // Rectangle and Image shapes
+          const radius = shape.cornerRadius ?? 0;
+          if (radius > 0) ctx.roundRect(shape.x, shape.y, shape.width, shape.height, radius);
+          else ctx.rect(shape.x, shape.y, shape.width, shape.height);
+
+          if (shape.type === 'image') {
+            if (!shape.imageElement && shape.src) {
+              const img = new Image();
+              img.src = shape.src;
+              img.onload = () => { shape.imageElement = img; };
+            }
+
+            const imgElement = shape.imageElement;
+            if (imgElement instanceof HTMLImageElement && imgElement.complete) {
+              ctx.save();
+              ctx.clip();
+              ctx.drawImage(imgElement, shape.x, shape.y, shape.width, shape.height);
+              ctx.restore();
+            } else {
+              ctx.fillStyle = '#1a1a1a'; 
+              ctx.fill();
+            }
+          } else {
+            ctx.fillStyle = shape.fill; 
+            ctx.fill();
+          }
+
+          if (shape.strokeWidth > 0) {
+            ctx.strokeStyle = shape.stroke;
+            ctx.lineWidth = shape.strokeWidth;
+            ctx.stroke();
+          }
         }
 
-        if (shape.strokeWidth > 0) {
-          ctx.strokeStyle = shape.stroke;
-          ctx.lineWidth = shape.strokeWidth;
-          ctx.stroke();
-        }
+
 
         // Selection Visuals
         if (selectedIds.includes(shape.id)) {
@@ -376,86 +491,196 @@ const Canvas = () => {
           ctx.fillText(label, labelX, labelY - (fontSize / 2) + paddingV);
 
           if (selectedIds.includes(shape.id) && selectedIds.length === 1) {
-            const rHandleSize = 4 / camera.zoom;
-            // Set a maximum margin so handles don't overlap in small shapes
-            const baseMargin = Math.min(shape.width, shape.height, 64 / camera.zoom) * 0.15;
-            const rMargin = Math.max(baseMargin, 12 / camera.zoom);
-            const squareSize = 8 / camera.zoom;
-            
-            // 1. Draw the main selection bounding box
-            ctx.strokeStyle = '#3b82f6';
-            ctx.lineWidth = 1 / camera.zoom;
-            ctx.beginPath();
-            ctx.rect(shape.x, shape.y, shape.width, shape.height);
-            ctx.stroke();
-            
-            // 2. Define the 4 corners for the square resize handles
-            const corners = [
-              { x: shape.x, y: shape.y },               // Top-Left
-              { x: shape.x + shape.width, y: shape.y }, // Top-Right
-              { x: shape.x, y: shape.y + shape.height }, // Bottom-Left
-              { x: shape.x + shape.width, y: shape.y + shape.height } // Bottom-Right
-            ];
-            
-            ctx.fillStyle = 'white';
-            ctx.strokeStyle = '#3b82f6';
-            ctx.lineWidth = 1 / camera.zoom;
-            
-            corners.forEach(c => {
-              ctx.beginPath();
-              ctx.rect(c.x - squareSize / 2, c.y - squareSize / 2, squareSize, squareSize);
-              ctx.fill();
-              ctx.stroke();
-            });
-            
-            // 3. Draw Radius handles ONLY inside the shape
-            // We adjust the direction of the margin based on which corner we are in
-            const radiusPositions = [
-              { x: shape.x + rMargin, y: shape.y + rMargin },               // Top-Left (Move In)
-              { x: shape.x + shape.width - rMargin, y: shape.y + rMargin }, // Top-Right (Move Left/Down)
-              { x: shape.x + rMargin, y: shape.y + shape.height - rMargin }, // Bottom-Left (Move Right/Up)
-              { x: shape.x + shape.width - rMargin, y: shape.y + shape.height - rMargin } // Bottom-Right (Move Left/Up)
-            ];
-            
-            radiusPositions.forEach(p => {
-              ctx.beginPath();
-              ctx.arc(p.x, p.y, rHandleSize, 0, Math.PI * 2);
-              ctx.fillStyle = 'white';
-              ctx.fill();
-              ctx.stroke();
-            });
-
-            // 3.5. Draw Rotation Handle
+            const handleSize = 8 / camera.zoom;
             const rotationHandleDistance = 30 / camera.zoom;
             const rotationHandleSize = 5 / camera.zoom;
-            const handleX = shape.x + shape.width / 2;
-            const handleY = shape.y - rotationHandleDistance;
             
-            // Line from top edge to handle
-            ctx.beginPath();
-            ctx.moveTo(handleX, shape.y);
-            ctx.lineTo(handleX, handleY);
-            ctx.strokeStyle = '#3b82f6';
-            ctx.lineWidth = 1.5 / camera.zoom;
-            ctx.stroke();
-            
-            // Circular rotation handle
-            ctx.beginPath();
-            ctx.arc(handleX, handleY, rotationHandleSize, 0, Math.PI * 2);
-            ctx.fillStyle = 'white';
-            ctx.strokeStyle = '#3b82f6';
-            ctx.lineWidth = 1.5 / camera.zoom;
-            ctx.fill();
-            ctx.stroke();
+            // Shape-specific selection handles
+            if (shape.type === 'line') {
+              // LINE: Show only endpoint handles
+              ctx.strokeStyle = '#3b82f6';
+              ctx.lineWidth = 1.5 / camera.zoom;
+              
+              // Draw line connecting endpoints for visual feedback
+              ctx.beginPath();
+              ctx.moveTo(shape.x, shape.y);
+              ctx.lineTo(shape.x2, shape.y2);
+              ctx.stroke();
+              
+              // Endpoint handles
+              const endpoints = [
+                { x: shape.x, y: shape.y },
+                { x: shape.x2, y: shape.y2 }
+              ];
+              
+              ctx.fillStyle = 'white';
+              ctx.strokeStyle = '#3b82f6';
+              ctx.lineWidth = 1 / camera.zoom;
+              
+              endpoints.forEach(point => {
+                ctx.beginPath();
+                ctx.rect(point.x - handleSize / 2, point.y - handleSize / 2, handleSize, handleSize);
+                ctx.fill();
+                ctx.stroke();
+              });
+              
+            } else if (shape.type === 'ellipse') {
+              // ELLIPSE: Show edge handles at cardinal points
+              ctx.strokeStyle = '#3b82f6';
+              ctx.lineWidth = 1 / camera.zoom;
+              
+              // Draw selection outline
+              const centerX = shape.x + shape.width / 2;
+              const centerY = shape.y + shape.height / 2;
+              ctx.beginPath();
+              ctx.ellipse(centerX, centerY, shape.rx, shape.ry, 0, 0, Math.PI * 2);
+              ctx.stroke();
+              
+              // Edge handles at cardinal points (N, S, E, W)
+              const edgePoints = [
+                { x: centerX, y: centerY - shape.ry }, // Top
+                { x: centerX, y: centerY + shape.ry }, // Bottom
+                { x: centerX - shape.rx, y: centerY }, // Left
+                { x: centerX + shape.rx, y: centerY }, // Right
+              ];
+              
+              ctx.fillStyle = 'white';
+              ctx.strokeStyle = '#3b82f6';
+              
+              edgePoints.forEach(point => {
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, handleSize / 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+              });
+              
+              // Corner handles for bounding box
+              const corners = [
+                { x: shape.x, y: shape.y },
+                { x: shape.x + shape.width, y: shape.y },
+                { x: shape.x, y: shape.y + shape.height },
+                { x: shape.x + shape.width, y: shape.y + shape.height }
+              ];
+              
+              corners.forEach(c => {
+                ctx.beginPath();
+                ctx.rect(c.x - handleSize / 2, c.y - handleSize / 2, handleSize, handleSize);
+                ctx.fill();
+                ctx.stroke();
+              });
+              
+              // Rotation handle
+              const handleX = shape.x + shape.width / 2;
+              const handleY = shape.y - rotationHandleDistance;
+              
+              ctx.beginPath();
+              ctx.moveTo(handleX, shape.y);
+              ctx.lineTo(handleX, handleY);
+              ctx.strokeStyle = '#3b82f6';
+              ctx.lineWidth = 1.5 / camera.zoom;
+              ctx.stroke();
+              
+              ctx.beginPath();
+              ctx.arc(handleX, handleY, rotationHandleSize, 0, Math.PI * 2);
+              ctx.fillStyle = 'white';
+              ctx.strokeStyle = '#3b82f6';
+              ctx.fill();
+              ctx.stroke();
+              
+            } else {
+              // RECTANGLE, CIRCLE, IMAGE: Show corner handles and rotation
+              const rHandleSize = 4 / camera.zoom;
+              const baseMargin = Math.min(shape.width, shape.height, 64 / camera.zoom) * 0.15;
+              const rMargin = Math.max(baseMargin, 12 / camera.zoom);
+              
+              // Selection bounding box
+              ctx.strokeStyle = '#3b82f6';
+              ctx.lineWidth = 1 / camera.zoom;
+              ctx.beginPath();
+              ctx.rect(shape.x, shape.y, shape.width, shape.height);
+              ctx.stroke();
+              
+              // Corner resize handles
+              const corners = [
+                { x: shape.x, y: shape.y },
+                { x: shape.x + shape.width, y: shape.y },
+                { x: shape.x, y: shape.y + shape.height },
+                { x: shape.x + shape.width, y: shape.y + shape.height }
+              ];
+              
+              ctx.fillStyle = 'white';
+              ctx.strokeStyle = '#3b82f6';
+              ctx.lineWidth = 1 / camera.zoom;
+              
+              corners.forEach(c => {
+                ctx.beginPath();
+                ctx.rect(c.x - handleSize / 2, c.y - handleSize / 2, handleSize, handleSize);
+                ctx.fill();
+                ctx.stroke();
+              });
+              
+              // Radius handles (for rectangles)
+              if (shape.type === 'rect') {
+                const radiusPositions = [
+                  { x: shape.x + rMargin, y: shape.y + rMargin },
+                  { x: shape.x + shape.width - rMargin, y: shape.y + rMargin },
+                  { x: shape.x + rMargin, y: shape.y + shape.height - rMargin },
+                  { x: shape.x + shape.width - rMargin, y: shape.y + shape.height - rMargin }
+                ];
+                
+                radiusPositions.forEach(p => {
+                  ctx.beginPath();
+                  ctx.arc(p.x, p.y, rHandleSize, 0, Math.PI * 2);
+                  ctx.fillStyle = 'white';
+                  ctx.fill();
+                  ctx.stroke();
+                });
+              }
+              
+              // Rotation handle
+              const handleX = shape.x + shape.width / 2;
+              const handleY = shape.y - rotationHandleDistance;
+              
+              ctx.beginPath();
+              ctx.moveTo(handleX, shape.y);
+              ctx.lineTo(handleX, handleY);
+              ctx.strokeStyle = '#3b82f6';
+              ctx.lineWidth = 1.5 / camera.zoom;
+              ctx.stroke();
+              
+              ctx.beginPath();
+              ctx.arc(handleX, handleY, rotationHandleSize, 0, Math.PI * 2);
+              ctx.fillStyle = 'white';
+              ctx.strokeStyle = '#3b82f6';
+              ctx.lineWidth = 1.5 / camera.zoom;
+              ctx.fill();
+              ctx.stroke();
+            }
 
-            // 4. Dimensions Label (Figma-style Blue Pill)
+            // Dimensions Label (for all shapes)
             const fontSize = 11 / camera.zoom;
             ctx.font = `600 ${fontSize}px Inter, sans-serif`;
-            const label = `${Math.round(shape.width)} × ${Math.round(shape.height)}`;
-            const textWidth = ctx.measureText(label).width;
             
-            const labelY = shape.y + shape.height + (12 / camera.zoom);
-            const labelX = shape.x + (shape.width / 2) - (textWidth / 2);
+            let label: string;
+            let labelY: number;
+            let labelX: number;
+            
+            if (shape.type === 'line') {
+              // For lines, show actual length
+              const length = Math.sqrt(Math.pow(shape.x2 - shape.x, 2) + Math.pow(shape.y2 - shape.y, 2));
+              label = `${Math.round(length)}`;
+              const midX = (shape.x + shape.x2) / 2;
+              const midY = (shape.y + shape.y2) / 2;
+              labelX = midX;
+              labelY = midY + (12 / camera.zoom);
+            } else {
+              label = `${Math.round(shape.width)} × ${Math.round(shape.height)}`;
+              labelY = shape.y + shape.height + (12 / camera.zoom);
+              labelX = shape.x + (shape.width / 2);
+            }
+            
+            const textWidth = ctx.measureText(label).width;
+            labelX = labelX - (textWidth / 2);
             const paddingH = 6 / camera.zoom;
             const paddingV = 3 / camera.zoom;
 
@@ -467,6 +692,7 @@ const Canvas = () => {
                 fontSize + (paddingV * 2), 
                 4 / camera.zoom
             );
+
             ctx.fillStyle = '#3b82f6';
             ctx.fill();
 
@@ -485,10 +711,15 @@ const Canvas = () => {
         ctx.fillRect(marqueeRect.x, marqueeRect.y, marqueeRect.w, marqueeRect.h);
         ctx.strokeRect(marqueeRect.x, marqueeRect.y, marqueeRect.w, marqueeRect.h);
       }
+
+      // Draw smart guides
+      if (smartGuides.length > 0) {
+        drawSmartGuides(ctx, smartGuides, shapes, camera.zoom);
+      }
       ctx.restore();
     };
     render();
-  }, [camera, shapes, selectedIds, showGrid, marqueeRect]);
+  }, [camera, shapes, selectedIds, showGrid, marqueeRect, smartGuides]);
 
   return (
     <canvas

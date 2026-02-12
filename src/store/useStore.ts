@@ -47,6 +47,17 @@ interface SceneState {
   moveForward: () => void;
   moveBackward: () => void;
   centerObject: (id: string) => void;
+  
+  // --- Alignment Actions ---
+  alignLeft: () => void;
+  alignCenter: () => void;
+  alignRight: () => void;
+  alignTop: () => void;
+  alignMiddle: () => void;
+  alignBottom: () => void;
+  
+  // --- Constraint Actions ---
+  toggleAspectRatioLock: (id: string) => void;
 
   // --- View Actions ---
   zoomIn: () => void;
@@ -127,12 +138,47 @@ export const useStore = create<SceneState>()(
         const centerX = (window.innerWidth / 2 - camera.x) / camera.zoom;
         const centerY = (window.innerHeight / 2 - camera.y) / camera.zoom;
 
-        const newShape: Shape = {
-          id: newId, type, x: centerX - 50, y: centerY - 50,
-          width: 100, height: 100, fill: '#D9D9D9',
-          stroke: '#000000', strokeWidth: 1, rotation: 0,
-          ...(type === ShapeType.Image ? { src: '' } : {}),
-        } as Shape;
+        let newShape: Shape;
+
+        if (type === ShapeType.Line) {
+          newShape = {
+            id: newId,
+            type: 'line',
+            x: centerX - 50,
+            y: centerY,
+            x2: centerX + 50,
+            y2: centerY,
+            width: 100,
+            height: 0,
+            fill: '#000000',
+            stroke: '#000000',
+            strokeWidth: 2,
+            rotation: 0,
+            lineCap: 'round',
+          };
+        } else if (type === ShapeType.Ellipse) {
+          newShape = {
+            id: newId,
+            type: 'ellipse',
+            x: centerX - 50,
+            y: centerY - 30,
+            width: 100,
+            height: 60,
+            rx: 50,
+            ry: 30,
+            fill: '#D9D9D9',
+            stroke: '#000000',
+            strokeWidth: 1,
+            rotation: 0,
+          };
+        } else {
+          newShape = {
+            id: newId, type, x: centerX - 50, y: centerY - 50,
+            width: 100, height: 100, fill: '#D9D9D9',
+            stroke: '#000000', strokeWidth: 1, rotation: 0,
+            ...(type === ShapeType.Image ? { src: '' } : {}),
+          } as Shape;
+        }
 
         const updatedPages = pages.map(p => 
           p.id === currentPageId ? { ...p, shapes: [...p.shapes, newShape] } : p
@@ -146,7 +192,37 @@ export const useStore = create<SceneState>()(
         set((state) => {
           const updatedPages = state.pages.map(p => p.id === state.currentPageId ? {
             ...p,
-            shapes: p.shapes.map(s => s.id === id ? ({ ...s, ...updates } as Shape) : s)
+            shapes: p.shapes.map(s => {
+              if (s.id !== id) return s;
+              
+              const updatedShape = { ...s, ...updates } as any;
+              
+              // Handle aspect ratio locking
+              if (s.aspectRatioLocked && (updates.width !== undefined || updates.height !== undefined)) {
+                const aspectRatio = s.width / s.height;
+                if (updates.width !== undefined && updates.height === undefined) {
+                  updatedShape.height = updates.width / aspectRatio;
+                } else if (updates.height !== undefined && updates.width === undefined) {
+                  updatedShape.width = updates.height * aspectRatio;
+                }
+              }
+              
+              // Sync properties for specific shape types
+              if (updatedShape.type === 'ellipse') {
+                if (updatedShape.width !== undefined) updatedShape.rx = updatedShape.width / 2;
+                if (updatedShape.height !== undefined) updatedShape.ry = updatedShape.height / 2;
+              } else if (updatedShape.type === 'line') {
+                if (updates.x !== undefined || updates.y !== undefined || (updates as any).x2 !== undefined || (updates as any).y2 !== undefined) {
+                  updatedShape.width = Math.abs(updatedShape.x2 - updatedShape.x);
+                  updatedShape.height = Math.abs(updatedShape.y2 - updatedShape.y);
+                }
+              }
+              
+              return updatedShape as Shape;
+            })
+
+
+
           } : p);
           return { pages: updatedPages };
         });
@@ -239,6 +315,183 @@ export const useStore = create<SceneState>()(
             y: (window.innerHeight / 2) - (shape.y + shape.height / 2) * camera.zoom,
           }
         });
+      },
+
+      // --- Alignment Functions ---
+      alignLeft: () => {
+        const { selectedIds, pages, currentPageId, saveHistory } = get();
+        if (selectedIds.length < 2) return;
+        
+        const currentPage = pages.find(p => p.id === currentPageId);
+        if (!currentPage) return;
+        
+        const selectedShapes = currentPage.shapes.filter(s => selectedIds.includes(s.id));
+        const leftmost = Math.min(...selectedShapes.map(s => s.x));
+        
+        const updatedPages = pages.map(p => {
+          if (p.id !== currentPageId) return p;
+          return {
+            ...p,
+            shapes: p.shapes.map(s => 
+              selectedIds.includes(s.id) ? { ...s, x: leftmost } : s
+            )
+          };
+        });
+        
+        set({ pages: updatedPages });
+        saveHistory();
+      },
+
+      alignCenter: () => {
+        const { selectedIds, pages, currentPageId, saveHistory } = get();
+        if (selectedIds.length < 2) return;
+        
+        const currentPage = pages.find(p => p.id === currentPageId);
+        if (!currentPage) return;
+        
+        const selectedShapes = currentPage.shapes.filter(s => selectedIds.includes(s.id));
+        const leftmost = Math.min(...selectedShapes.map(s => s.x));
+        const rightmost = Math.max(...selectedShapes.map(s => s.x + s.width));
+        const centerX = (leftmost + rightmost) / 2;
+        
+        const updatedPages = pages.map(p => {
+          if (p.id !== currentPageId) return p;
+          return {
+            ...p,
+            shapes: p.shapes.map(s => 
+              selectedIds.includes(s.id) 
+                ? { ...s, x: centerX - s.width / 2 } 
+                : s
+            )
+          };
+        });
+        
+        set({ pages: updatedPages });
+        saveHistory();
+      },
+
+      alignRight: () => {
+        const { selectedIds, pages, currentPageId, saveHistory } = get();
+        if (selectedIds.length < 2) return;
+        
+        const currentPage = pages.find(p => p.id === currentPageId);
+        if (!currentPage) return;
+        
+        const selectedShapes = currentPage.shapes.filter(s => selectedIds.includes(s.id));
+        const rightmost = Math.max(...selectedShapes.map(s => s.x + s.width));
+        
+        const updatedPages = pages.map(p => {
+          if (p.id !== currentPageId) return p;
+          return {
+            ...p,
+            shapes: p.shapes.map(s => 
+              selectedIds.includes(s.id) 
+                ? { ...s, x: rightmost - s.width } 
+                : s
+            )
+          };
+        });
+        
+        set({ pages: updatedPages });
+        saveHistory();
+      },
+
+      alignTop: () => {
+        const { selectedIds, pages, currentPageId, saveHistory } = get();
+        if (selectedIds.length < 2) return;
+        
+        const currentPage = pages.find(p => p.id === currentPageId);
+        if (!currentPage) return;
+        
+        const selectedShapes = currentPage.shapes.filter(s => selectedIds.includes(s.id));
+        const topmost = Math.min(...selectedShapes.map(s => s.y));
+        
+        const updatedPages = pages.map(p => {
+          if (p.id !== currentPageId) return p;
+          return {
+            ...p,
+            shapes: p.shapes.map(s => 
+              selectedIds.includes(s.id) ? { ...s, y: topmost } : s
+            )
+          };
+        });
+        
+        set({ pages: updatedPages });
+        saveHistory();
+      },
+
+      alignMiddle: () => {
+        const { selectedIds, pages, currentPageId, saveHistory } = get();
+        if (selectedIds.length < 2) return;
+        
+        const currentPage = pages.find(p => p.id === currentPageId);
+        if (!currentPage) return;
+        
+        const selectedShapes = currentPage.shapes.filter(s => selectedIds.includes(s.id));
+        const topmost = Math.min(...selectedShapes.map(s => s.y));
+        const bottommost = Math.max(...selectedShapes.map(s => s.y + s.height));
+        const centerY = (topmost + bottommost) / 2;
+        
+        const updatedPages = pages.map(p => {
+          if (p.id !== currentPageId) return p;
+          return {
+            ...p,
+            shapes: p.shapes.map(s => 
+              selectedIds.includes(s.id) 
+                ? { ...s, y: centerY - s.height / 2 } 
+                : s
+            )
+          };
+        });
+        
+        set({ pages: updatedPages });
+        saveHistory();
+      },
+
+      alignBottom: () => {
+        const { selectedIds, pages, currentPageId, saveHistory } = get();
+        if (selectedIds.length < 2) return;
+        
+        const currentPage = pages.find(p => p.id === currentPageId);
+        if (!currentPage) return;
+        
+        const selectedShapes = currentPage.shapes.filter(s => selectedIds.includes(s.id));
+        const bottommost = Math.max(...selectedShapes.map(s => s.y + s.height));
+        
+        const updatedPages = pages.map(p => {
+          if (p.id !== currentPageId) return p;
+          return {
+            ...p,
+            shapes: p.shapes.map(s => 
+              selectedIds.includes(s.id) 
+                ? { ...s, y: bottommost - s.height } 
+                : s
+            )
+          };
+        });
+        
+        set({ pages: updatedPages });
+        saveHistory();
+      },
+
+      // --- Constraint Functions ---
+      toggleAspectRatioLock: (id) => {
+        const { pages, currentPageId, saveHistory } = get();
+        
+        const updatedPages = pages.map(p => {
+          if (p.id !== currentPageId) return p;
+          return {
+            ...p,
+            shapes: p.shapes.map(s => 
+              s.id === id 
+                ? { ...s, aspectRatioLocked: !s.aspectRatioLocked } 
+                : s
+            )
+          };
+        });
+        
+        set({ pages: updatedPages });
+        saveHistory();
       },
 
       zoomIn: () => {
