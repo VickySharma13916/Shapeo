@@ -1,6 +1,17 @@
 import type { Shape } from '../../engine/types';
 
 const imageCache = new Map<string, HTMLImageElement>();
+const THEME_ADAPTIVE_LINE_STROKES = new Set(['#000', '#000000', '#111827', '#1f2937', '#0f172a']);
+
+const normalizeHex = (color: string): string => color.trim().toLowerCase();
+
+const getLineStrokeColor = (stroke: string, theme: 'dark' | 'light') => {
+  const normalized = normalizeHex(stroke);
+  if (THEME_ADAPTIVE_LINE_STROKES.has(normalized)) {
+    return theme === 'dark' ? '#e5e7eb' : '#0f172a';
+  }
+  return stroke;
+};
 
 const getCachedImage = (src: string): HTMLImageElement => {
   const existing = imageCache.get(src);
@@ -24,8 +35,7 @@ export const drawShape = ( ctx: CanvasRenderingContext2D, shape: Shape, theme: '
   ctx.beginPath();
 
   if (shape.type === 'line') {
-    const strokeColor =
-      shape.stroke === '#000000' ? (theme === 'dark' ? '#e5e7eb' : '#0f172a') : shape.stroke;
+    const strokeColor = getLineStrokeColor(shape.stroke, theme);
     ctx.moveTo(shape.x, shape.y);
     ctx.lineTo(shape.x2, shape.y2);
     if (shape.lineCap) ctx.lineCap = shape.lineCap;

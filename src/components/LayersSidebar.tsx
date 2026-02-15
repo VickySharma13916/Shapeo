@@ -205,6 +205,7 @@ const LayersSidebar = () => {
 
   const renderShapeRow = (shape: Shape, depth: number): React.ReactNode => {
     const nodeKey = toNodeKey('shape', shape.id);
+    const isSelected = selectedShapeSet.has(shape.id);
     return (
       <div
         key={nodeKey}
@@ -215,7 +216,7 @@ const LayersSidebar = () => {
         onDrop={handleDrop}
         onClick={(event) => handleLayerClick(event, shape.id)}
         className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs cursor-pointer fluent-smooth ${
-          selectedShapeSet.has(shape.id)
+          isSelected
             ? 'bg-blue-600 text-white fluent-depth-8 fluent-glow-blue'
             : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200 fluent-reveal'
         } ${rowDropClass(nodeKey)}`}
@@ -239,7 +240,11 @@ const LayersSidebar = () => {
             event.stopPropagation();
             toggleShapeLock(shape.id);
           }}
-          className="p-0.5 rounded hover:bg-white/10 text-zinc-300 hover:text-white fluent-smooth"
+          className={`p-0.5 rounded fluent-smooth ${
+            isSelected
+              ? 'text-white/90 hover:text-white hover:bg-white/20'
+              : 'hover:bg-white/10 text-zinc-300 hover:text-white'
+          }`}
           title={shape.locked ? 'Unlock layer' : 'Lock layer'}
         >
           {shape.locked ? <Lock size={11} /> : <Unlock size={11} />}
@@ -392,14 +397,14 @@ const LayersSidebar = () => {
   if (!leftSidebarVisible) {
     return (
       <div
-        className={`fixed top-4 left-4 w-12 h-12 rounded-xl fluent-acrylic flex items-center justify-center z-50 cursor-pointer fluent-depth-16 fluent-smooth fluent-reveal ${
+        className={`fixed top-4 left-4 w-10 h-10 rounded-lg flex items-center justify-center z-50 cursor-pointer fluent-depth-16 fluent-smooth fluent-reveal ${
           isLight
             ? 'border border-slate-300/70 bg-white/85 hover:bg-slate-100/90'
             : 'border border-white/10 hover:bg-white/5'
         }`}
         onClick={toggleLeftSidebar}
       >
-        <PanelLeft size={20} className={isLight ? 'text-slate-700' : 'text-white'} />
+        <PanelLeft size={16} className={isLight ? 'text-slate-700' : 'text-white'} />
       </div>
     );
   }
@@ -436,12 +441,14 @@ const LayersSidebar = () => {
 
       <div className="px-2 py-4 border-b border-white/5">
         <div className="flex justify-between items-center mb-2 px-2 text-zinc-500">
-          <span className="text-[10px] text-white font-bold uppercase tracking-widest">Pages</span>
+          <span className={`text-[10px] font-bold uppercase tracking-widest ${isLight ? 'text-slate-700' : 'text-white'}`}>Pages</span>
           <button
             onClick={addPage}
-            className="p-1 hover:bg-white/5 rounded hover:text-white fluent-smooth fluent-reveal"
+            className={`p-1 rounded fluent-smooth fluent-reveal ${
+              isLight ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/80' : 'hover:bg-white/5 hover:text-white'
+            }`}
           >
-            <Plus size={14} color="white" />
+            <Plus size={14} className={isLight ? 'text-slate-700' : 'text-white'} />
           </button>
         </div>
         {pages.map((page) => (
@@ -531,7 +538,7 @@ const LayersSidebar = () => {
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex justify-between items-center px-4 py-3 text-zinc-500">
-          <span className="text-[10px] text-white font-bold uppercase tracking-widest">Layers</span>
+          <span className={`text-[10px] font-bold uppercase tracking-widest ${isLight ? 'text-slate-700' : 'text-white'}`}>Layers</span>
           <div className="flex items-center gap-1">
             <input
               type="file"
@@ -542,30 +549,40 @@ const LayersSidebar = () => {
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="p-1 hover:bg-white/5 rounded hover:text-white fluent-smooth fluent-reveal"
+              className={`p-1 rounded fluent-smooth fluent-reveal ${
+                isLight ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/80' : 'hover:bg-white/5 hover:text-white'
+              }`}
               title="Upload Image"
             >
-              <Upload size={14} color="white" />
+              <Upload size={14} className={isLight ? 'text-slate-700' : 'text-white'} />
             </button>
             <button
               onClick={groupSelectedLayers}
               disabled={!canGroup}
               className={`p-1 rounded fluent-smooth ${
-                canGroup ? 'hover:bg-white/5 hover:text-white' : 'opacity-40 cursor-not-allowed'
+                canGroup
+                  ? isLight
+                    ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/80'
+                    : 'hover:bg-white/5 hover:text-white'
+                  : 'opacity-40 cursor-not-allowed'
               }`}
               title="Group selected layers"
             >
-              <Folder size={14} color="white" />
+              <Folder size={14} className={isLight ? 'text-slate-700' : 'text-white'} />
             </button>
             <button
               onClick={ungroupSelectedLayers}
               disabled={!canUngroup}
               className={`p-1 rounded fluent-smooth ${
-                canUngroup ? 'hover:bg-white/5 hover:text-white' : 'opacity-40 cursor-not-allowed'
+                canUngroup
+                  ? isLight
+                    ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/80'
+                    : 'hover:bg-white/5 hover:text-white'
+                  : 'opacity-40 cursor-not-allowed'
               }`}
               title="Ungroup selected layers"
             >
-              <X size={14} color="white" />
+              <X size={14} className={isLight ? 'text-slate-700' : 'text-white'} />
             </button>
           </div>
         </div>

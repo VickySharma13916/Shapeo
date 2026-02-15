@@ -15,6 +15,7 @@ export const ShapeType = {
   Line: 'line',
   Ellipse: 'ellipse',
   Image: 'image',
+  Plus: "plus",
 } as const;
 
 export type ShapeType = typeof ShapeType[keyof typeof ShapeType];

@@ -100,6 +100,13 @@ export const useKeyboard = () => {
         paste();
       }
 
+      // Duplicate: Mod + D
+      if (isMod && key === 'd') {
+        e.preventDefault();
+        copy();
+        paste();
+      }
+
       // --- HISTORY ACTIONS ---
       // Undo: Mod + Z
       if (isMod && key === 'z' && !e.shiftKey) {
