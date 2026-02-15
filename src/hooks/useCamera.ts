@@ -48,7 +48,7 @@ export const useCamera = (canvasRef: React.RefObject<HTMLCanvasElement | null>) 
       canvas.removeEventListener('wheel', handleWheel);
       window.removeEventListener('mousemove', handleMouseMove);
     };
-  }, [handleWheel, handleMouseMove]);
+  }, [handleWheel, handleMouseMove, canvasRef]);
 
   return { camera };
 };

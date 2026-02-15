@@ -1,4 +1,3 @@
-// src/engine/utils.ts
 import type { Point, Camera, Shape } from './types';
 import { ShapeType } from './types';
 

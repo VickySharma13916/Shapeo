@@ -75,7 +75,7 @@ const ToolbarDropdown = ({ options, activeToolId, className = '' }: ToolbarDropd
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute -top-[164px] left-0 mt-2 min-w-[200px] fluent-acrylic border border-white/10 rounded-xl fluent-depth-32 overflow-hidden z-50 fluent-animate-in">
+        <div className="absolute -top-41 left-0 mt-2 min-w-50 fluent-acrylic border border-white/10 rounded-xl fluent-depth-32 overflow-hidden z-50 fluent-animate-in">
           {options.map((option) => (
             <button
               key={option.id}

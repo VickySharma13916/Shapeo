@@ -1,12 +1,17 @@
 import { useEffect } from 'react';
 
 import { useStore } from '../store/useStore';
+import { getVisibleLayerShapeIds } from '../store/layerTree';
 
 import type { Shape } from '../engine/types';
 
 export const useKeyboard = () => {
   // Use the updated pluralized actions from your store
-  const { copy, paste, deleteShapes, selectedIds, setSelectedIds, undo, redo, cut, setMode, pages, currentPageId, updateShape, saveHistory, toggleRightSidebar, toggleLeftSidebar } = useStore();
+  const {
+    copy, paste, deleteShapes, selectedIds, setSelectedIds, undo, redo, cut, setMode, pages, currentPageId, updateShape, 
+    saveHistory, toggleRightSidebar, toggleLeftSidebar, moveForward, moveBackward, bringToFront, sendToBack, groupSelectedLayers, 
+    ungroupSelectedLayers, toggleLockSelected,
+  } = useStore();
 
   useEffect(() => {
     const currentPageShapes = pages.find(p => p.id === currentPageId)?.shapes || [];
@@ -20,6 +25,35 @@ export const useKeyboard = () => {
       const key = e.key.toLowerCase();
 
       const step = e.shiftKey ? 10 : 1;
+
+      if (e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        const currentPage = pages.find((page) => page.id === currentPageId);
+        if (!currentPage) return;
+
+        const orderedShapeIds = getVisibleLayerShapeIds(currentPage);
+        if (orderedShapeIds.length === 0) return;
+
+        const selectedInOrder = selectedIds.filter((id) => orderedShapeIds.includes(id));
+        const anchorId =
+          selectedInOrder.length > 0 ? selectedInOrder[selectedInOrder.length - 1] : orderedShapeIds[0];
+        const anchorIndex = Math.max(0, orderedShapeIds.indexOf(anchorId));
+        const delta = e.key === 'ArrowUp' ? -1 : 1;
+        const targetIndex = Math.max(0, Math.min(orderedShapeIds.length - 1, anchorIndex + delta));
+        const targetId = orderedShapeIds[targetIndex];
+
+        if (!targetId || targetId === anchorId) {
+          e.preventDefault();
+          return;
+        }
+
+        const isSelected = selectedIds.includes(targetId);
+        const nextSelectedIds = isSelected
+          ? selectedIds.filter((id) => id !== targetId)
+          : [...selectedIds, targetId];
+        setSelectedIds(nextSelectedIds);
+        e.preventDefault();
+        return;
+      }
 
       // --- CLIPBOARD ACTIONS ---
       if (selectedIds.length > 0 && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
@@ -103,9 +137,48 @@ export const useKeyboard = () => {
           toggleLeftSidebar();
         }
       }
+
+      // --- LAYER ORDER (Figma Style) ---
+      if (isMod && e.code === 'BracketRight') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          bringToFront();
+        } else {
+          moveForward();
+        }
+      }
+
+      if (isMod && e.code === 'BracketLeft') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          sendToBack();
+        } else {
+          moveBackward();
+        }
+      }
+
+      // --- GROUPING (Figma Style) ---
+      if (isMod && key === 'g') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          ungroupSelectedLayers();
+        } else {
+          groupSelectedLayers();
+        }
+      }
+
+      // --- LOCKING (Figma Style) ---
+      if (isMod && e.shiftKey && key === 'l') {
+        e.preventDefault();
+        toggleLockSelected();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [copy, paste, deleteShapes, selectedIds, setSelectedIds, undo, redo, cut, setMode, pages, currentPageId, updateShape, saveHistory, toggleLeftSidebar, toggleRightSidebar]);
+  }, [
+    copy, paste, deleteShapes, selectedIds, setSelectedIds, undo, redo, cut, setMode, pages, currentPageId, updateShape, 
+    saveHistory, toggleLeftSidebar, toggleRightSidebar, moveForward, moveBackward, bringToFront, sendToBack, groupSelectedLayers, 
+    ungroupSelectedLayers, toggleLockSelected,
+  ]);
 };

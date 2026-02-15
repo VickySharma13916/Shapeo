@@ -22,7 +22,10 @@ export type ShapeType = typeof ShapeType[keyof typeof ShapeType];
 // Added support for professional styling properties
 export interface BaseShape {
   id: string;
+  name?: string;
   type: ShapeType;
+  groupId?: string;
+  locked?: boolean;
   x: number;
   y: number;
   width: number;
@@ -81,8 +84,18 @@ export type Handle = 'nw' | 'n' | 'ne' | 'w' | 'e' | 'sw' | 's' | 'se';
 export type Mode = 'select' | 'pan';
 
 // New: For Page-based organization
+export interface LayerGroup {
+  id: string;
+  name: string;
+  parentGroupId?: string;
+  childIds?: string[];
+  collapsed?: boolean;
+}
+
 export interface Page {
   id: string;
   name: string;
   shapes: Shape[];
+  rootLayerIds?: string[];
+  groups?: LayerGroup[];
 }

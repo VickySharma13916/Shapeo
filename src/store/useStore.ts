@@ -4,14 +4,57 @@ import { persist } from 'zustand/middleware';
 import { ShapeType } from '../engine/types';
 import type { Mode, Shape, Page } from '../engine/types';
 
+import { duplicateShapeForPaste } from './clipboard';
+
+import {
+  deleteGroupBranch, ensureLayerTree, getGroupDescendantShapeIds, groupShapes, moveLayerNode as moveLayerNodeInTree, 
+  moveLayerNodeToRootEnd as moveLayerNodeToRootEndInTree, renameLayerGroup, ungroupByGroupIds, type DropPosition, type LayerNodeKey
+} from './layerTree';
+
+import { bringSelectedToFront, moveSelectedBackward, moveSelectedForward, sendSelectedToBack } from './layerOrder';
+
+type ShapeUpdates = Partial<Shape> & {
+  x2?: number;
+  y2?: number;
+};
+
+const unique = <T,>(values: T[]) => [...new Set(values)];
+
+type HistoryEntry = {
+  pages: Page[];
+  currentPageId: string;
+  selectedIds: string[];
+};
+
+type ThemeMode = 'dark' | 'light';
+
+const cloneHistoryEntry = (entry: HistoryEntry): HistoryEntry =>
+  JSON.parse(JSON.stringify(entry)) as HistoryEntry;
+
+const createHistoryEntry = (state: {
+  pages: Page[];
+  currentPageId: string;
+  selectedIds: string[];
+}): HistoryEntry =>
+  cloneHistoryEntry({
+    pages: state.pages,
+    currentPageId: state.currentPageId,
+    selectedIds: state.selectedIds,
+  });
+
+const initialPages: Page[] = [{ id: 'page-1', name: 'Page 1', shapes: [], groups: [] }];
+const initialCurrentPageId = 'page-1';
+
 interface SceneState {
   // --- Core State ---
   pages: Page[];
   currentPageId: string;
   confirmDeleteId: string | null;
+  confirmDeleteGroupId: string | null;
   selectedIds: string[];
   camera: { x: number; y: number; zoom: number };
   mode: Mode;
+  theme: ThemeMode;
   showGrid: boolean;
   
   // --- UI & Clipboard ---
@@ -20,7 +63,7 @@ interface SceneState {
   rightSidebarVisible: boolean;
 
   // --- History State ---
-  history: Shape[][];
+  history: HistoryEntry[];
   historyIndex: number;
 
   // --- Actions ---
@@ -28,6 +71,7 @@ interface SceneState {
   setSelectedIds: (ids: string[]) => void;
   toggleSelection: (id: string) => void;
   setMode: (mode: Mode) => void;
+  toggleTheme: () => void;
   toggleGrid: () => void;
   toggleLeftSidebar: () => void;
   toggleRightSidebar: () => void;
@@ -35,18 +79,30 @@ interface SceneState {
   // --- Page Actions ---
   addPage: () => void;
   setCurrentPage: (id: string) => void;
+  renamePage: (id: string, name: string) => void;
   setConfirmDeleteId: (id: string | null) => void;
+  setConfirmDeleteGroupId: (id: string | null) => void;
   deletePage: (id: string) => void;
   
   // --- Object Manipulation ---
   addShape: (type: ShapeType) => void;
-  updateShape: (id: string, updates: Partial<Shape>, commitToHistory?: boolean) => void;
+  updateShape: (id: string, updates: ShapeUpdates, commitToHistory?: boolean) => void;
   deleteShapes: () => void;
   bringToFront: () => void;
   sendToBack: () => void;
   moveForward: () => void;
   moveBackward: () => void;
   centerObject: (id: string) => void;
+  groupSelectedLayers: () => void;
+  ungroupSelectedLayers: () => void;
+  renameGroup: (groupId: string, name: string) => void;
+  deleteGroup: (groupId: string) => void;
+  toggleGroupLock: (groupId: string) => void;
+  moveLayerNode: (dragNodeKey: LayerNodeKey, targetNodeKey: LayerNodeKey, position: DropPosition) => void;
+  moveLayerNodeToRootEnd: (dragNodeKey: LayerNodeKey) => void;
+  toggleGroupCollapse: (groupId: string) => void;
+  toggleShapeLock: (id: string) => void;
+  toggleLockSelected: () => void;
   
   // --- Alignment Actions ---
   alignLeft: () => void;
@@ -80,13 +136,21 @@ export const useStore = create<SceneState>()(
   persist(
     (set, get) => ({
       // --- Initial State ---
-      pages: [{ id: 'page-1', name: 'Page 1', shapes: [] }],
-      currentPageId: 'page-1',
+      pages: initialPages,
+      currentPageId: initialCurrentPageId,
+      confirmDeleteGroupId: null,
       selectedIds: [],
       camera: { x: 0, y: 0, zoom: 1 },
       mode: 'select',
+      theme: 'dark',
       showGrid: false,
-      history: [[]],
+      history: [
+        createHistoryEntry({
+          pages: initialPages,
+          currentPageId: initialCurrentPageId,
+          selectedIds: [],
+        }),
+      ],
       historyIndex: 0,
       clipboard: null,
       leftSidebarVisible: true,
@@ -104,19 +168,39 @@ export const useStore = create<SceneState>()(
         };
       }),
       setMode: (mode) => set({ mode }),
+      toggleTheme: () =>
+        set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
       toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
       toggleLeftSidebar: () => set((state) => ({ leftSidebarVisible: !state.leftSidebarVisible })),
       toggleRightSidebar: () => set((state) => ({ rightSidebarVisible: !state.rightSidebarVisible })),
 
       // --- Page Management ---
       addPage: () => {
-        const newPage = { id: Math.random().toString(36).substring(7), name: `Page ${get().pages.length + 1}`, shapes: [] };
-        set({ pages: [...get().pages, newPage], currentPageId: newPage.id, selectedIds: [] });
+        const { pages, saveHistory } = get();
+        const newPage = {
+          id: Math.random().toString(36).substring(7),
+          name: `Page ${pages.length + 1}`,
+          shapes: [],
+          groups: [],
+        };
+        set({ pages: [...pages, newPage], currentPageId: newPage.id, selectedIds: [] });
+        saveHistory();
       },
-      setCurrentPage: (id) => set({ currentPageId: id, selectedIds: [], history: [[]], historyIndex: 0 }),
+      setCurrentPage: (id) => set({ currentPageId: id, selectedIds: [] }),
+      renamePage: (id, name) => {
+        const { pages, saveHistory } = get();
+        const trimmedName = name.trim();
+        if (!trimmedName) return;
+        const page = pages.find((entry) => entry.id === id);
+        if (!page || page.name === trimmedName) return;
+        set({
+          pages: pages.map((page) => (page.id === id ? { ...page, name: trimmedName } : page)),
+        });
+        saveHistory();
+      },
 
       deletePage: (id: string) => {
-        const { pages, currentPageId } = get();
+        const { pages, currentPageId, saveHistory } = get();
         if (pages.length <= 1) return;
 
         const updatedPages = pages.filter(p => p.id !== id);
@@ -127,31 +211,37 @@ export const useStore = create<SceneState>()(
           currentPageId: nextId, 
           selectedIds: [] 
         });
+        saveHistory();
       },
       confirmDeleteId: null,
       setConfirmDeleteId: (id) => set({ confirmDeleteId: id }),
+      setConfirmDeleteGroupId: (id) => set({ confirmDeleteGroupId: id }),
 
       // --- Object Logic (All targeting current Page) ---
       addShape: (type) => {
-        const { camera, pages, currentPageId, saveHistory } = get();
+        const { camera, pages, currentPageId, saveHistory, theme } = get();
         const newId = Math.random().toString(36).substring(7);
         const centerX = (window.innerWidth / 2 - camera.x) / camera.zoom;
         const centerY = (window.innerHeight / 2 - camera.y) / camera.zoom;
+        const defaultStroke = theme === 'dark' ? '#e5e7eb' : '#0f172a';
+        const defaultFill = theme === 'dark' ? '#4b5563' : '#d9d9d9';
 
         let newShape: Shape;
 
         if (type === ShapeType.Line) {
           newShape = {
             id: newId,
+            name: 'Line',
             type: 'line',
             x: centerX - 50,
             y: centerY,
             x2: centerX + 50,
             y2: centerY,
+            locked: false,
             width: 100,
             height: 0,
-            fill: '#000000',
-            stroke: '#000000',
+            fill: 'transparent',
+            stroke: defaultStroke,
             strokeWidth: 2,
             rotation: 0,
             lineCap: 'round',
@@ -159,23 +249,26 @@ export const useStore = create<SceneState>()(
         } else if (type === ShapeType.Ellipse) {
           newShape = {
             id: newId,
+            name: 'Ellipse',
             type: 'ellipse',
             x: centerX - 50,
             y: centerY - 30,
+            locked: false,
             width: 100,
             height: 60,
             rx: 50,
             ry: 30,
-            fill: '#D9D9D9',
-            stroke: '#000000',
+            fill: defaultFill,
+            stroke: defaultStroke,
             strokeWidth: 1,
             rotation: 0,
           };
         } else {
           newShape = {
-            id: newId, type, x: centerX - 50, y: centerY - 50,
-            width: 100, height: 100, fill: '#D9D9D9',
-            stroke: '#000000', strokeWidth: 1, rotation: 0,
+            id: newId, name: type === ShapeType.Image ? 'Image' : 'Rectangle', type, x: centerX - 50, y: centerY - 50,
+            locked: false,
+            width: 100, height: 100, fill: defaultFill,
+            stroke: defaultStroke, strokeWidth: 1, rotation: 0,
             ...(type === ShapeType.Image ? { src: '' } : {}),
           } as Shape;
         }
@@ -194,8 +287,9 @@ export const useStore = create<SceneState>()(
             ...p,
             shapes: p.shapes.map(s => {
               if (s.id !== id) return s;
+              if (s.locked) return s;
               
-              const updatedShape = { ...s, ...updates } as any;
+              const updatedShape = { ...s, ...updates };
               
               // Handle aspect ratio locking
               if (s.aspectRatioLocked && (updates.width !== undefined || updates.height !== undefined)) {
@@ -212,9 +306,10 @@ export const useStore = create<SceneState>()(
                 if (updatedShape.width !== undefined) updatedShape.rx = updatedShape.width / 2;
                 if (updatedShape.height !== undefined) updatedShape.ry = updatedShape.height / 2;
               } else if (updatedShape.type === 'line') {
-                if (updates.x !== undefined || updates.y !== undefined || (updates as any).x2 !== undefined || (updates as any).y2 !== undefined) {
-                  updatedShape.width = Math.abs(updatedShape.x2 - updatedShape.x);
-                  updatedShape.height = Math.abs(updatedShape.y2 - updatedShape.y);
+                const lineShape = updatedShape as Extract<Shape, { type: 'line' }>;
+                if (updates.x !== undefined || updates.y !== undefined || updates.x2 !== undefined || updates.y2 !== undefined) {
+                  lineShape.width = Math.abs(lineShape.x2 - lineShape.x);
+                  lineShape.height = Math.abs(lineShape.y2 - lineShape.y);
                 }
               }
               
@@ -232,9 +327,22 @@ export const useStore = create<SceneState>()(
       deleteShapes: () => {
         const { selectedIds, pages, currentPageId, saveHistory } = get();
         if (selectedIds.length === 0) return;
-        const updatedPages = pages.map(p => p.id === currentPageId ? {
-          ...p, shapes: p.shapes.filter(s => !selectedIds.includes(s.id))
-        } : p);
+        let changed = false;
+        const updatedPages = pages.map(p => {
+          if (p.id !== currentPageId) return p;
+          const nextShapes = p.shapes.filter(s => !(selectedIds.includes(s.id) && !s.locked));
+          changed = nextShapes.length !== p.shapes.length;
+          const groups = (p.groups ?? []).filter((group) =>
+            nextShapes.some((shape) => shape.groupId === group.id)
+          );
+          const cleanedShapes = nextShapes.map((shape) =>
+            shape.groupId && !groups.some((group) => group.id === shape.groupId)
+              ? { ...shape, groupId: undefined }
+              : shape
+          );
+          return { ...p, shapes: cleanedShapes, groups };
+        });
+        if (!changed) return;
         set({ pages: updatedPages, selectedIds: [] });
         saveHistory();
       },
@@ -242,12 +350,16 @@ export const useStore = create<SceneState>()(
       bringToFront: () => {
         const { selectedIds, pages, currentPageId, saveHistory } = get();
         if (selectedIds.length === 0) return;
+        let changed = false;
         const updatedPages = pages.map(p => {
           if (p.id !== currentPageId) return p;
-          const selected = p.shapes.filter(s => selectedIds.includes(s.id));
-          const others = p.shapes.filter(s => !selectedIds.includes(s.id));
-          return { ...p, shapes: [...others, ...selected] };
+          const treePage = ensureLayerTree(p);
+          const reordered = bringSelectedToFront(treePage.shapes, selectedIds);
+          changed = reordered.changed;
+          if (!changed) return treePage;
+          return ensureLayerTree({ ...treePage, shapes: reordered.shapes });
         });
+        if (!changed) return;
         set({ pages: updatedPages });
         saveHistory();
       },
@@ -255,12 +367,16 @@ export const useStore = create<SceneState>()(
       sendToBack: () => {
         const { selectedIds, pages, currentPageId, saveHistory } = get();
         if (selectedIds.length === 0) return;
+        let changed = false;
         const updatedPages = pages.map(p => {
           if (p.id !== currentPageId) return p;
-          const selected = p.shapes.filter(s => selectedIds.includes(s.id));
-          const others = p.shapes.filter(s => !selectedIds.includes(s.id));
-          return { ...p, shapes: [...selected, ...others] };
+          const treePage = ensureLayerTree(p);
+          const reordered = sendSelectedToBack(treePage.shapes, selectedIds);
+          changed = reordered.changed;
+          if (!changed) return treePage;
+          return ensureLayerTree({ ...treePage, shapes: reordered.shapes });
         });
+        if (!changed) return;
         set({ pages: updatedPages });
         saveHistory();
       },
@@ -268,18 +384,16 @@ export const useStore = create<SceneState>()(
       moveForward: () => {
         const { selectedIds, pages, currentPageId, saveHistory } = get();
         if (selectedIds.length === 0) return;
+        let changed = false;
         const updatedPages = pages.map(p => {
           if (p.id !== currentPageId) return p;
-          const shapes = [...p.shapes];
-          
-          // Move each selected shape forward one position
-          for (let i = shapes.length - 2; i >= 0; i--) {
-            if (selectedIds.includes(shapes[i].id) && !selectedIds.includes(shapes[i + 1].id)) {
-              [shapes[i], shapes[i + 1]] = [shapes[i + 1], shapes[i]];
-            }
-          }
-          return { ...p, shapes };
+          const treePage = ensureLayerTree(p);
+          const reordered = moveSelectedForward(treePage.shapes, selectedIds);
+          changed = reordered.changed;
+          if (!changed) return treePage;
+          return ensureLayerTree({ ...treePage, shapes: reordered.shapes });
         });
+        if (!changed) return;
         set({ pages: updatedPages });
         saveHistory();
       },
@@ -287,18 +401,16 @@ export const useStore = create<SceneState>()(
       moveBackward: () => {
         const { selectedIds, pages, currentPageId, saveHistory } = get();
         if (selectedIds.length === 0) return;
+        let changed = false;
         const updatedPages = pages.map(p => {
           if (p.id !== currentPageId) return p;
-          const shapes = [...p.shapes];
-          
-          // Move each selected shape backward one position
-          for (let i = 1; i < shapes.length; i++) {
-            if (selectedIds.includes(shapes[i].id) && !selectedIds.includes(shapes[i - 1].id)) {
-              [shapes[i], shapes[i - 1]] = [shapes[i - 1], shapes[i]];
-            }
-          }
-          return { ...p, shapes };
+          const treePage = ensureLayerTree(p);
+          const reordered = moveSelectedBackward(treePage.shapes, selectedIds);
+          changed = reordered.changed;
+          if (!changed) return treePage;
+          return ensureLayerTree({ ...treePage, shapes: reordered.shapes });
         });
+        if (!changed) return;
         set({ pages: updatedPages });
         saveHistory();
       },
@@ -315,6 +427,191 @@ export const useStore = create<SceneState>()(
             y: (window.innerHeight / 2) - (shape.y + shape.height / 2) * camera.zoom,
           }
         });
+      },
+
+      groupSelectedLayers: () => {
+        const { selectedIds, pages, currentPageId, saveHistory } = get();
+        if (selectedIds.length < 2) return;
+
+        let changed = false;
+        const updatedPages = pages.map((page) => {
+          if (page.id !== currentPageId) return page;
+          const grouped = groupShapes(page, selectedIds);
+          changed = grouped.changed;
+          return grouped.page;
+        });
+
+        if (!changed) return;
+        set({ pages: updatedPages });
+        saveHistory();
+      },
+
+      ungroupSelectedLayers: () => {
+        const { selectedIds, pages, currentPageId, saveHistory } = get();
+        if (selectedIds.length === 0) return;
+
+        let changed = false;
+        const updatedPages = pages.map((page) => {
+          if (page.id !== currentPageId) return page;
+          const treePage = ensureLayerTree(page);
+          const selectedSet = new Set(selectedIds);
+          const groupIds = unique(
+            treePage.shapes
+              .filter((shape) => selectedSet.has(shape.id) && shape.groupId)
+              .map((shape) => shape.groupId as string)
+          );
+          const ungrouped = ungroupByGroupIds(treePage, groupIds);
+          changed = ungrouped.changed;
+          return ungrouped.page;
+        });
+
+        if (!changed) return;
+        set({ pages: updatedPages });
+        saveHistory();
+      },
+
+      renameGroup: (groupId, name) => {
+        const { pages, currentPageId } = get();
+        const updatedPages = pages.map((page) =>
+          page.id === currentPageId ? renameLayerGroup(page, groupId, name) : page
+        );
+        set({ pages: updatedPages });
+      },
+
+      deleteGroup: (groupId) => {
+        const { pages, currentPageId, selectedIds, saveHistory } = get();
+        let changed = false;
+        let deletedShapeIds: string[] = [];
+
+        const updatedPages = pages.map((page) => {
+          if (page.id !== currentPageId) return page;
+          const result = deleteGroupBranch(page, groupId);
+          changed = result.changed;
+          deletedShapeIds = result.deletedShapeIds;
+          return result.page;
+        });
+
+        if (!changed) return;
+        const deletedSet = new Set(deletedShapeIds);
+        set({
+          pages: updatedPages,
+          selectedIds: selectedIds.filter((id) => !deletedSet.has(id)),
+        });
+        saveHistory();
+      },
+
+      toggleGroupLock: (groupId) => {
+        const { pages, currentPageId, saveHistory } = get();
+        let changed = false;
+
+        const updatedPages = pages.map((page) => {
+          if (page.id !== currentPageId) return page;
+          const shapeIds = getGroupDescendantShapeIds(page, groupId);
+          if (shapeIds.length === 0) return page;
+
+          const shapeSet = new Set(shapeIds);
+          const targetLockState = page.shapes
+            .filter((shape) => shapeSet.has(shape.id))
+            .some((shape) => !shape.locked);
+
+          const nextShapes = page.shapes.map((shape) => {
+            if (!shapeSet.has(shape.id)) return shape;
+            if ((shape.locked ?? false) === targetLockState) return shape;
+            changed = true;
+            return { ...shape, locked: targetLockState };
+          });
+
+          return { ...page, shapes: nextShapes };
+        });
+
+        if (!changed) return;
+        set({ pages: updatedPages });
+        saveHistory();
+      },
+
+      moveLayerNode: (dragNodeKey, targetNodeKey, position) => {
+        const { pages, currentPageId, saveHistory } = get();
+        let changed = false;
+        const updatedPages = pages.map((page) => {
+          if (page.id !== currentPageId) return page;
+          const moved = moveLayerNodeInTree(page, dragNodeKey, targetNodeKey, position);
+          changed = moved.changed;
+          return moved.page;
+        });
+        if (!changed) return;
+        set({ pages: updatedPages });
+        saveHistory();
+      },
+
+      moveLayerNodeToRootEnd: (dragNodeKey) => {
+        const { pages, currentPageId, saveHistory } = get();
+        let changed = false;
+        const updatedPages = pages.map((page) => {
+          if (page.id !== currentPageId) return page;
+          const moved = moveLayerNodeToRootEndInTree(page, dragNodeKey);
+          changed = moved.changed;
+          return moved.page;
+        });
+        if (!changed) return;
+        set({ pages: updatedPages });
+        saveHistory();
+      },
+
+      toggleGroupCollapse: (groupId) => {
+        const { pages, currentPageId } = get();
+        const updatedPages = pages.map((page) => {
+          if (page.id !== currentPageId) return page;
+          return {
+            ...page,
+            groups: (page.groups ?? []).map((group) =>
+              group.id === groupId ? { ...group, collapsed: !group.collapsed } : group
+            ),
+          };
+        });
+        set({ pages: updatedPages });
+      },
+
+      toggleShapeLock: (id) => {
+        const { pages, currentPageId, saveHistory } = get();
+        const updatedPages = pages.map((page) => {
+          if (page.id !== currentPageId) return page;
+          return {
+            ...page,
+            shapes: page.shapes.map((shape) =>
+              shape.id === id ? { ...shape, locked: !shape.locked } : shape
+            ),
+          };
+        });
+        set({ pages: updatedPages });
+        saveHistory();
+      },
+
+      toggleLockSelected: () => {
+        const { pages, currentPageId, selectedIds, saveHistory } = get();
+        if (selectedIds.length === 0) return;
+
+        let changed = false;
+        const updatedPages = pages.map((page) => {
+          if (page.id !== currentPageId) return page;
+
+          const selectedSet = new Set(selectedIds);
+          const selectedShapes = page.shapes.filter((shape) => selectedSet.has(shape.id));
+          if (selectedShapes.length === 0) return page;
+
+          const shouldLock = selectedShapes.some((shape) => !shape.locked);
+          const nextShapes = page.shapes.map((shape) => {
+            if (!selectedSet.has(shape.id)) return shape;
+            if ((shape.locked ?? false) === shouldLock) return shape;
+            changed = true;
+            return { ...shape, locked: shouldLock };
+          });
+
+          return { ...page, shapes: nextShapes };
+        });
+
+        if (!changed) return;
+        set({ pages: updatedPages });
+        saveHistory();
       },
 
       // --- Alignment Functions ---
@@ -508,30 +805,47 @@ export const useStore = create<SceneState>()(
 
       // --- History ---
       saveHistory: () => {
-        const { pages, currentPageId, history, historyIndex } = get();
-        const currentShapes = pages.find(p => p.id === currentPageId)?.shapes || [];
+        const { pages, currentPageId, selectedIds, history, historyIndex } = get();
+        const snapshot = createHistoryEntry({ pages, currentPageId, selectedIds });
+        const current = history[historyIndex];
+        if (
+          current &&
+          JSON.stringify(current.pages) === JSON.stringify(snapshot.pages) &&
+          current.currentPageId === snapshot.currentPageId &&
+          JSON.stringify(current.selectedIds) === JSON.stringify(snapshot.selectedIds)
+        ) {
+          return;
+        }
         const cleanHistory = history.slice(0, historyIndex + 1);
         set({
-          history: [...cleanHistory, JSON.parse(JSON.stringify(currentShapes))],
+          history: [...cleanHistory, snapshot],
           historyIndex: cleanHistory.length,
         });
       },
 
       undo: () => {
-        const { history, historyIndex, pages, currentPageId } = get();
+        const { history, historyIndex } = get();
         if (historyIndex > 0) {
-          const prevShapes = history[historyIndex - 1];
-          const updatedPages = pages.map(p => p.id === currentPageId ? { ...p, shapes: prevShapes } : p);
-          set({ pages: updatedPages, historyIndex: historyIndex - 1, selectedIds: [] });
+          const prev = cloneHistoryEntry(history[historyIndex - 1]);
+          set({
+            pages: prev.pages,
+            currentPageId: prev.currentPageId,
+            selectedIds: prev.selectedIds,
+            historyIndex: historyIndex - 1,
+          });
         }
       },
 
       redo: () => {
-        const { history, historyIndex, pages, currentPageId } = get();
+        const { history, historyIndex } = get();
         if (historyIndex < history.length - 1) {
-          const nextShapes = history[historyIndex + 1];
-          const updatedPages = pages.map(p => p.id === currentPageId ? { ...p, shapes: nextShapes } : p);
-          set({ pages: updatedPages, historyIndex: historyIndex + 1 });
+          const next = cloneHistoryEntry(history[historyIndex + 1]);
+          set({
+            pages: next.pages,
+            currentPageId: next.currentPageId,
+            selectedIds: next.selectedIds,
+            historyIndex: historyIndex + 1,
+          });
         }
       },
 
@@ -546,9 +860,7 @@ export const useStore = create<SceneState>()(
       paste: () => {
         const { clipboard, pages, currentPageId, saveHistory } = get();
         if (!clipboard) return;
-        const newShapes = clipboard.map(s => ({
-          ...s, id: Math.random().toString(36).substring(7), x: s.x + 20, y: s.y + 20
-        }));
+        const newShapes = clipboard.map(duplicateShapeForPaste);
         const updatedPages = pages.map(p => p.id === currentPageId ? { ...p, shapes: [...p.shapes, ...newShapes] } : p);
         set({ pages: updatedPages, selectedIds: newShapes.map(s => s.id) });
         saveHistory();
@@ -557,7 +869,7 @@ export const useStore = create<SceneState>()(
       cut: () => { get().copy(); get().deleteShapes(); },
 
       addImage: (file: File) => {
-        const { camera, pages, currentPageId, saveHistory } = get();
+        const { camera, pages, currentPageId, saveHistory, theme } = get();
         const reader = new FileReader();
 
         reader.onload = (f) => {
@@ -572,14 +884,16 @@ export const useStore = create<SceneState>()(
             // Inside addImage in useStore.ts
             const newImageShape: Shape = {
               id: newId,
+              name: 'Image',
               type: ShapeType.Image,
+              locked: false,
               x: centerX - img.width / 4,
               y: centerY - img.height / 4,
               width: img.width / 2,
               height: img.height / 2,
               src: src,
               fill: 'transparent',
-              stroke: '#000000',
+              stroke: theme === 'dark' ? '#e5e7eb' : '#0f172a',
               strokeWidth: 0,
               rotation: 0,
               opacity: 1,
@@ -614,6 +928,7 @@ export const useStore = create<SceneState>()(
         pages: state.pages,
         currentPageId: state.currentPageId,
         camera: state.camera,
+        theme: state.theme,
         showGrid: state.showGrid,
         leftSidebarVisible: state.leftSidebarVisible,
         rightSidebarVisible: state.rightSidebarVisible

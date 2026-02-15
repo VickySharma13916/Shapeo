@@ -1,12 +1,16 @@
 'use client';
-import { Hand, MousePointer2, RotateCcw, RotateCw, SquareDashed, Trash2, Square, Minus, Circle } from 'lucide-react';
-import { ShapeType, type ShapeType as ShapeTypeType } from '../engine/types';
-import { useStore } from '../store/useStore';
-import ToolbarDropdown, { type ToolOption } from './ToolbarDropdown';
+import { Circle, Hand, Minus, MousePointer2, RotateCcw, RotateCw, Square, SquareDashed, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
+import { ShapeType, type ShapeType as ShapeTypeType } from '../engine/types';
+
+import { useStore } from '../store/useStore';
+
+import ToolbarDropdown, { type ToolOption } from './ToolbarDropdown';
+
 const Toolbar = () => {
-  const { addShape, selectedIds, setSelectedIds, pages, currentPageId, deleteShapes, mode, setMode, undo, redo, deleteImage } = useStore();
+  const { addShape, selectedIds, setSelectedIds, pages, currentPageId, deleteShapes, mode, theme, setMode, undo, redo, deleteImage } = useStore();
+  const isLight = theme === 'light';
   const [activeShapeTool, setActiveShapeTool] = useState<ShapeTypeType>(ShapeType.Rectangle);
 
   // FIX: Derive shapes from the active page so Select All works correctly
@@ -53,12 +57,30 @@ const Toolbar = () => {
   ];
 
   return (
-    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2 fluent-acrylic border border-white/10 rounded-2xl fluent-depth-32 z-50">
+    <div
+      className={`app-toolbar fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2.5 rounded-2xl z-50 ${
+        isLight
+          ? 'bg-white/88 border border-slate-300/80 shadow-[0_14px_32px_rgba(15,23,42,0.16)]'
+          : 'fluent-acrylic border border-white/15 fluent-depth-32 shadow-[0_18px_40px_rgba(0,0,0,0.45)]'
+      }`}
+    >
       {/* Selection Mode Toggles */}
-      <div className="flex bg-black/20 rounded-xl p-1 gap-1">
+      <div
+        className={`flex rounded-xl p-1 gap-1 border ${
+          isLight
+            ? 'bg-slate-100 border-slate-300/60'
+            : 'bg-black/25 border-white/5'
+        }`}
+      >
         <button
           onClick={() => setMode('select')}
-          className={`p-2 rounded-lg fluent-smooth cursor-pointer ${mode === 'select' ? 'bg-zinc-700 text-white fluent-depth-8 fluent-glow-subtle' : 'text-zinc-500 hover:text-zinc-300 fluent-reveal'}`}
+          className={`p-2 rounded-lg fluent-smooth cursor-pointer ${
+            mode === 'select'
+              ? 'bg-blue-600 text-white fluent-depth-8'
+              : isLight
+                ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/80'
+                : 'text-zinc-500 hover:text-zinc-200 fluent-reveal'
+          }`}
           title="Select Tool (V)"
         >
           <MousePointer2 size={18} />
@@ -66,39 +88,57 @@ const Toolbar = () => {
 
         <button 
           onClick={() => setMode('pan')}
-          className={`p-2 rounded-lg fluent-smooth cursor-pointer ${mode === 'pan' ? 'bg-zinc-700 text-white fluent-depth-8 fluent-glow-subtle' : 'text-zinc-500 hover:text-zinc-300 fluent-reveal'}`}
+          className={`p-2 rounded-lg fluent-smooth cursor-pointer ${
+            mode === 'pan'
+              ? 'bg-blue-600 text-white fluent-depth-8'
+              : isLight
+                ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/80'
+                : 'text-zinc-500 hover:text-zinc-200 fluent-reveal'
+          }`}
           title="Hand Tool (H)"
         >
           <Hand size={18} />
         </button>
       </div>
 
-      <div className="w-px h-6 fluent-divider-vertical mx-1" />
+      <div className={`w-px h-6 mx-1 ${isLight ? 'bg-slate-300/80' : 'fluent-divider-vertical'}`} />
 
       {/* History Controls */}
       <div className="flex gap-0.5">
         <button 
           onClick={undo} 
-          className="p-2 hover:bg-white/5 rounded-lg text-zinc-400 hover:text-white fluent-reveal fluent-smooth cursor-pointer"
+          className={`p-2 rounded-lg fluent-smooth cursor-pointer ${
+            isLight
+              ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/80'
+              : 'hover:bg-white/5 text-zinc-400 hover:text-white fluent-reveal'
+          }`}
           title="Undo (Ctrl+Z)"
         >
           <RotateCcw size={18} />
         </button>
         <button 
           onClick={redo} 
-          className="p-2 hover:bg-white/5 rounded-lg text-zinc-400 hover:text-white fluent-reveal fluent-smooth cursor-pointer"
+          className={`p-2 rounded-lg fluent-smooth cursor-pointer ${
+            isLight
+              ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/80'
+              : 'hover:bg-white/5 text-zinc-400 hover:text-white fluent-reveal'
+          }`}
           title="Redo (Ctrl+Shift+Z)"
         >
           <RotateCw size={18} />
         </button>
       </div>
 
-      <div className="w-px h-6 fluent-divider-vertical mx-1" />
+      <div className={`w-px h-6 mx-1 ${isLight ? 'bg-slate-300/80' : 'fluent-divider-vertical'}`} />
       
       {/* Selection Actions */}
       <button 
         onClick={handleSelectAll}
-        className="p-2 hover:bg-white/5 rounded-lg text-zinc-400 hover:text-white fluent-reveal fluent-smooth cursor-pointer"
+        className={`p-2 rounded-lg fluent-smooth cursor-pointer ${
+          isLight
+            ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/80'
+            : 'hover:bg-white/5 text-zinc-400 hover:text-white fluent-reveal'
+        }`}
         title="Select All (Ctrl+A)"
       >
         <SquareDashed size={18} />
@@ -126,7 +166,7 @@ const Toolbar = () => {
 
       {/* Selection Counter */}
       {selectedIds.length > 1 && (
-        <div className="absolute -top-10 left-1/2 -translate-x-1/2 fluent-acrylic bg-blue-600/30 text-white text-[10px] px-3 py-1.5 rounded-full font-bold fluent-depth-8 whitespace-nowrap fluent-animate-in border border-blue-400/30">
+        <div className="absolute -top-11 left-1/2 -translate-x-1/2 fluent-acrylic bg-blue-600/25 text-white text-[10px] px-3 py-1.5 rounded-full font-bold fluent-depth-8 whitespace-nowrap fluent-animate-in border border-blue-300/35 shadow-[0_8px_24px_rgba(37,99,235,0.35)]">
           {selectedIds.length} objects selected
         </div>
       )}

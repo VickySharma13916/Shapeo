@@ -3,6 +3,106 @@
 
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --app-bg: #0f1115;
+  --app-text: #ffffff;
+  --app-dot-opacity: 0.25;
+}
+
+.theme-light {
+  --app-bg: #f4f7fb;
+  --app-text: #0f172a;
+  --app-dot-opacity: 0.12;
+}
+
+.app-shell {
+  background: var(--app-bg);
+  color: var(--app-text);
+}
+
+.theme-light .premium-panel {
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.96) 0%, rgba(246, 248, 252, 0.96) 100%),
+    rgba(255, 255, 255, 0.9);
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow:
+    0 18px 34px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.theme-light .premium-header {
+  border-bottom-color: rgba(15, 23, 42, 0.08);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.9) 0%, rgba(241, 245, 249, 0.7) 100%);
+}
+
+.theme-light .fluent-acrylic::before {
+  opacity: 0.35;
+}
+
+.theme-light .text-white {
+  color: #0f172a !important;
+}
+
+.theme-light .text-zinc-400,
+.theme-light .text-zinc-500 {
+  color: #475569 !important;
+}
+
+.theme-light .bg-zinc-700,
+.theme-light .bg-zinc-800\/40,
+.theme-light .bg-zinc-800\/20 {
+  background-color: rgba(148, 163, 184, 0.22) !important;
+}
+
+.theme-light .hover\:bg-zinc-700:hover {
+  background-color: rgba(100, 116, 139, 0.32) !important;
+}
+
+.theme-light .border-white\/10 {
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+.theme-light .fluent-reveal:hover {
+  background-color: rgba(15, 23, 42, 0.06);
+}
+
+.theme-light .layers-sidebar,
+.theme-light .property-sidebar {
+  color: #334155;
+}
+
+.theme-light .layers-sidebar .text-zinc-300,
+.theme-light .layers-sidebar .text-zinc-400,
+.theme-light .layers-sidebar .text-zinc-500,
+.theme-light .layers-sidebar .text-zinc-600,
+.theme-light .property-sidebar .text-zinc-300,
+.theme-light .property-sidebar .text-zinc-400,
+.theme-light .property-sidebar .text-zinc-500,
+.theme-light .property-sidebar .text-zinc-600 {
+  color: #475569 !important;
+}
+
+.theme-light .layers-sidebar .border-white\/5,
+.theme-light .property-sidebar .border-zinc-700\/40,
+.theme-light .property-sidebar .border-zinc-700\/50,
+.theme-light .property-sidebar .border-zinc-700\/60,
+.theme-light .property-sidebar .border-zinc-700\/70 {
+  border-color: rgba(148, 163, 184, 0.45) !important;
+}
+
+.theme-light .layers-sidebar .hover\:bg-white\/5:hover,
+.theme-light .property-sidebar .hover\:bg-zinc-700:hover,
+.theme-light .property-sidebar .hover\:bg-zinc-800\/60:hover,
+.theme-light .property-sidebar .hover\:bg-zinc-800\/70:hover {
+  background-color: rgba(148, 163, 184, 0.3) !important;
+}
+
+.theme-light .property-sidebar .bg-zinc-900\/80 {
+  background-color: rgba(226, 232, 240, 0.75) !important;
+}
+
+.theme-light .property-sidebar input,
+.theme-light .property-sidebar select {
+  color: #0f172a;
 }
 
 * {

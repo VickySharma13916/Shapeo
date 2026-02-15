@@ -45,6 +45,21 @@
   -webkit-backdrop-filter: blur(var(--fluent-acrylic-blur)) saturate(150%);
 }
 
+.premium-panel {
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 38%, rgba(0, 0, 0, 0.2) 100%),
+    var(--fluent-acrylic-bg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 20px 46px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.premium-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 100%);
+}
+
 .fluent-acrylic::before {
   content: "";
   position: absolute;

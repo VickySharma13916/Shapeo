@@ -1,9 +1,8 @@
 import React from 'react';
 import { 
-  ChevronDown, Download, ZoomIn, ZoomOut, PanelRight, Target, Droplet, Square, Home, RotateCw, 
-  ChevronsUp, ChevronUp, ChevronDown as ChevronDownIcon, ChevronsDown,
-  AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical,
-  Link, Unlink, Box
+  ChevronDown, Download, ZoomIn, ZoomOut, PanelRight, Target, Droplet, Square, Home, RotateCw, ChevronsUp, ChevronUp, 
+  ChevronDown as ChevronDownIcon, ChevronsDown, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, 
+  AlignEndVertical, Link, Unlink, Box
 } from 'lucide-react';
 
 import { useStore } from '../store/useStore';
@@ -23,11 +22,11 @@ const SidebarSection = ({ title, children, icon }: { title: string, children: Re
 
 export default function PropertySidebar() {
   const { 
-    pages, currentPageId, selectedIds, updateShape, saveHistory, camera, setCamera, 
-    zoomIn, zoomOut, centerObject, rightSidebarVisible, toggleRightSidebar, 
-    bringToFront, sendToBack, moveForward, moveBackward, alignLeft, alignCenter, 
-    alignRight, alignTop, alignMiddle, alignBottom, toggleAspectRatioLock
+    pages, currentPageId, selectedIds, updateShape, saveHistory, camera, setCamera, zoomIn, zoomOut, centerObject, rightSidebarVisible, 
+    toggleRightSidebar, bringToFront, sendToBack, moveForward, moveBackward, alignLeft, alignCenter, alignRight, alignTop, alignMiddle, 
+    alignBottom, toggleAspectRatioLock, theme
   } = useStore();
+  const isLight = theme === 'light';
 
   const currentPage = pages.find(p => p.id === currentPageId);
   const shapes = currentPage?.shapes || [];
@@ -125,11 +124,15 @@ export default function PropertySidebar() {
 
   if (!rightSidebarVisible) {
     return (
-      <div className="fixed top-4 right-4 w-64 h-auto fluent-acrylic border border-white/10 rounded-lg z-50 p-3 fluent-depth-16">
+      <div className={`property-sidebar fixed top-4 right-4 w-64 h-auto fluent-acrylic premium-panel rounded-lg z-50 p-3 ${isLight ? 'text-slate-700' : ''}`}>
         {renderNavigator()}
         <button 
           onClick={toggleRightSidebar}
-          className="w-full mt-2 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-white text-[10px] font-bold fluent-smooth flex items-center justify-center gap-2 fluent-reveal"
+          className={`w-full mt-2 py-1.5 rounded text-[10px] font-bold fluent-smooth flex items-center justify-center gap-2 fluent-reveal ${
+            isLight
+              ? 'bg-slate-200/90 hover:bg-slate-300 text-slate-800'
+              : 'bg-zinc-800 hover:bg-zinc-700 text-white'
+          }`}
         >
           <PanelRight size={14} />
           Show Properties
@@ -139,10 +142,10 @@ export default function PropertySidebar() {
   }
 
   return (
-    <div className="fixed top-4 right-4 w-64 h-[calc(100%-30px)] rounded-lg fluent-acrylic border border-white/10 overflow-y-auto z-50 p-4 select-none fluent-depth-16 flex flex-col fluent-scrollbar">
+    <div className={`property-sidebar fixed top-4 right-4 w-64 h-[calc(100%-30px)] rounded-lg fluent-acrylic premium-panel overflow-y-auto z-50 p-4 select-none flex flex-col fluent-scrollbar ${isLight ? 'text-slate-700' : ''}`}>
       <div className="flex justify-between items-center mb-4 px-0.5">
-        <span className="text-white text-xs font-bold uppercase tracking-widest opacity-70">Inspector</span>
-        <button onClick={toggleRightSidebar} className="text-blue-400 hover:text-white cursor-pointer fluent-smooth fluent-reveal">
+        <span className={`text-xs font-bold uppercase tracking-widest opacity-70 ${isLight ? 'text-slate-700' : 'text-white'}`}>Inspector</span>
+        <button onClick={toggleRightSidebar} className={`cursor-pointer fluent-smooth fluent-reveal ${isLight ? 'text-blue-600 hover:text-slate-900' : 'text-blue-400 hover:text-white'}`}>
           <PanelRight size={16} />
         </button>
       </div>
