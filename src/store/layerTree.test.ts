@@ -118,6 +118,46 @@ describe('layerTree', () => {
     expect(result.page.shapes.find((shape) => shape.id === 'a')?.groupId).toBeUndefined();
   });
 
+  it('moves a shape inside a frame and assigns frameId', () => {
+    const frame: Shape = {
+      ...rect('f1'),
+      id: 'f1',
+      type: 'frame',
+      clipContent: true,
+    };
+    const page: Page = ensureLayerTree({
+      id: 'p1',
+      name: 'Page 1',
+      shapes: [frame, rect('a')],
+      rootLayerIds: [toNodeKey('shape', 'f1'), toNodeKey('shape', 'a')],
+      groups: [],
+    });
+
+    const moved = moveLayerNode(page, toNodeKey('shape', 'a'), toNodeKey('shape', 'f1'), 'inside');
+    expect(moved.changed).toBe(true);
+    expect(moved.page.shapes.find((shape) => shape.id === 'a')?.frameId).toBe('f1');
+  });
+
+  it('moving shape to root clears frameId', () => {
+    const frame: Shape = {
+      ...rect('f1'),
+      id: 'f1',
+      type: 'frame',
+      clipContent: true,
+    };
+    const page: Page = ensureLayerTree({
+      id: 'p1',
+      name: 'Page 1',
+      shapes: [frame, { ...rect('a'), frameId: 'f1' }],
+      rootLayerIds: [toNodeKey('shape', 'f1'), toNodeKey('shape', 'a')],
+      groups: [],
+    });
+
+    const moved = moveLayerNodeToRootEnd(page, toNodeKey('shape', 'a'));
+    expect(moved.changed).toBe(true);
+    expect(moved.page.shapes.find((shape) => shape.id === 'a')?.frameId).toBeUndefined();
+  });
+
   it('returns visible layer shape order as shown in sidebar', () => {
     const page: Page = {
       id: 'p1',

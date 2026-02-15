@@ -15,14 +15,13 @@ const Toolbar = () => {
   const {
     addShape, selectedIds, setSelectedIds, pages, currentPageId, deleteShapes, mode, theme, setMode, undo, redo, history, 
     historyIndex, deleteImage, copy, paste, groupSelectedLayers, ungroupSelectedLayers, toggleLockSelected, moveForward, 
-    moveBackward, bringToFront, sendToBack,
+    moveBackward, bringToFront, sendToBack, createFrameFromSelection, moveSelectionIntoFrame, removeSelectionFromFrame,
   } = useStore();
 
   const [activeShapeTool, setActiveShapeTool] = useState<ShapeTypeType>(ShapeType.Rectangle);
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const arrangeMenuRef = useRef<HTMLDivElement>(null);
   const organizeMenuRef = useRef<HTMLDivElement>(null);
-  const isLight = theme === 'light';
 
   const currentPage = pages.find((p) => p.id === currentPageId);
   const currentShapes = currentPage?.shapes || [];
@@ -33,6 +32,10 @@ const Toolbar = () => {
   const allSelectedLocked = hasSelection && selectedShapes.every((shape) => shape.locked);
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
+  const selectedFrames = selectedShapes.filter((shape) => shape.type === ShapeType.Frame);
+  const selectedFrameId = selectedFrames.length === 1 ? selectedFrames[0].id : null;
+  const canMoveIntoFrame = Boolean(selectedFrameId && selectedShapes.some((shape) => shape.id !== selectedFrameId && !shape.locked));
+  const canRemoveFromFrame = selectedShapes.some((shape) => !shape.locked && shape.frameId);
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -62,54 +65,37 @@ const Toolbar = () => {
 
   const shapeOptions: ToolOption[] = [
     { id: ShapeType.Rectangle, label: 'Rectangle', icon: <Square size={17} />, shortcut: 'R', action: () => { setActiveShapeTool(ShapeType.Rectangle); addShape(ShapeType.Rectangle); } },
+    { id: ShapeType.Frame, label: 'Frame', icon: <Square size={17} />, shortcut: 'F', action: () => { setActiveShapeTool(ShapeType.Frame); addShape(ShapeType.Frame); } },
     { id: ShapeType.Line, label: 'Line', icon: <Minus size={17} />, shortcut: 'L', action: () => { setActiveShapeTool(ShapeType.Line); addShape(ShapeType.Line); } },
     { id: ShapeType.Ellipse, label: 'Ellipse', icon: <Circle size={17} />, shortcut: 'O', action: () => { setActiveShapeTool(ShapeType.Ellipse); addShape(ShapeType.Ellipse); } },
   ];
 
-  const shellClass = isLight
-    ? 'bg-white/94 border border-slate-300/80 shadow-[0_18px_34px_rgba(15,23,42,0.14)]'
-    : 'fluent-acrylic border border-white/15 shadow-[0_22px_48px_rgba(0,0,0,0.5)]';
-  const groupClass = isLight
-    ? 'bg-slate-100/85 border border-slate-300/70'
-    : 'bg-black/20 border border-white/10';
-  const buttonClass = isLight
-    ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/90'
-    : 'text-zinc-400 hover:text-white hover:bg-white/6';
-  const mutedClass = isLight ? 'text-slate-400' : 'text-zinc-600';
-  const dividerClass = isLight ? 'bg-slate-300/90' : 'bg-white/10';
-  const menuClass = isLight
-    ? 'bg-white border border-slate-300 shadow-[0_14px_30px_rgba(15,23,42,0.16)]'
-    : 'fluent-acrylic border border-white/10 shadow-[0_16px_34px_rgba(0,0,0,0.5)]';
-  const menuItemClass = isLight
-    ? 'text-slate-700 hover:bg-slate-100'
-    : 'text-zinc-300 hover:bg-white/6';
-
   return (
-    <div className={`app-toolbar fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-2.5 rounded-2xl z-50 ${shellClass}`}>
-      <div className={`flex items-center gap-1 p-1 rounded-xl ${groupClass}`}>
+    <div className="app-toolbar tb-shell fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-2.5 rounded-2xl z-50 border fluent-acrylic">
+      <div className="tb-group flex items-center gap-1 p-1 rounded-xl">
         <button
           onClick={() => setMode('select')}
-          className={`p-2 rounded-lg fluent-smooth cursor-pointer ${mode === 'select' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25' : buttonClass}`}
+          className={`tb-button p-2 rounded-lg fluent-smooth cursor-pointer ${mode === 'select' ? 'tb-button-active' : ''}`}
           title="Select (V)"
         >
           <MousePointer2 size={17} />
         </button>
         <button
           onClick={() => setMode('pan')}
-          className={`p-2 rounded-lg fluent-smooth cursor-pointer ${mode === 'pan' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25' : buttonClass}`}
+          className={`tb-button p-2 rounded-lg fluent-smooth cursor-pointer ${mode === 'pan' ? 'tb-button-active' : ''}`}
           title="Hand (H)"
         >
           <Hand size={17} />
         </button>
       </div>
 
-      <div className={`w-px h-7 ${dividerClass}`} />
+      <div className="tb-divider w-px h-7" />
 
-      <div className={`flex items-center gap-1 p-1 rounded-xl ${groupClass}`}>
+      <div className="tb-group flex items-center gap-1 p-1 rounded-xl">
         <button
           onClick={undo}
           disabled={!canUndo}
-          className={`p-2 rounded-lg fluent-smooth cursor-pointer ${canUndo ? buttonClass : 'opacity-40 cursor-not-allowed'} `}
+          className="tb-button p-2 rounded-lg fluent-smooth cursor-pointer"
           title="Undo (Ctrl/Cmd+Z)"
         >
           <RotateCcw size={17} />
@@ -117,19 +103,19 @@ const Toolbar = () => {
         <button
           onClick={redo}
           disabled={!canRedo}
-          className={`p-2 rounded-lg fluent-smooth cursor-pointer ${canRedo ? buttonClass : 'opacity-40 cursor-not-allowed'}`}
+          className="tb-button p-2 rounded-lg fluent-smooth cursor-pointer"
           title="Redo (Ctrl/Cmd+Shift+Z)"
         >
           <RotateCw size={17} />
         </button>
       </div>
 
-      <div className={`w-px h-7 ${dividerClass}`} />
+      <div className="tb-divider w-px h-7" />
 
-      <div className={`flex items-center gap-1 p-1 rounded-xl ${groupClass}`}>
+      <div className="tb-group flex items-center gap-1 p-1 rounded-xl">
         <button
           onClick={handleSelectAll}
-          className={`p-2 rounded-lg fluent-smooth cursor-pointer ${buttonClass}`}
+          className="tb-button p-2 rounded-lg fluent-smooth cursor-pointer"
           title="Select All (Ctrl/Cmd+A)"
         >
           <SquareDashed size={17} />
@@ -143,28 +129,26 @@ const Toolbar = () => {
         />
       </div>
 
-      <div className={`w-px h-7 ${dividerClass}`} />
+      <div className="tb-divider w-px h-7" />
 
-      <div className={`flex items-center gap-1 p-1 rounded-xl ${groupClass}`}>
+      <div className="tb-group flex items-center gap-1 p-1 rounded-xl">
         <div className="relative" ref={arrangeMenuRef}>
           <button
             onClick={() => setOpenMenu(openMenu === 'arrange' ? null : 'arrange')}
             disabled={!hasSelection}
-            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg fluent-smooth cursor-pointer ${
-              hasSelection ? buttonClass : 'opacity-40 cursor-not-allowed'
-            }`}
+            className="tb-button flex items-center gap-1.5 px-2.5 py-2 rounded-lg fluent-smooth cursor-pointer"
             title="Arrange Layers"
           >
             <Layers size={16} />
-            <ChevronDown size={13} className={mutedClass} />
+            <ChevronDown size={13} className="tb-icon-dim" />
           </button>
 
           {openMenu === 'arrange' && hasSelection && (
-            <div className={`absolute bottom-full mb-2 left-0 min-w-48 rounded-xl p-1 ${menuClass}`}>
-              <button onClick={() => { bringToFront(); setOpenMenu(null); }} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm fluent-smooth ${menuItemClass}`}><ChevronsUp size={14} />Bring To Front</button>
-              <button onClick={() => { moveForward(); setOpenMenu(null); }} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm fluent-smooth ${menuItemClass}`}><ChevronUp size={14} />Move Forward</button>
-              <button onClick={() => { moveBackward(); setOpenMenu(null); }} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm fluent-smooth ${menuItemClass}`}><ChevronDown size={14} />Move Backward</button>
-              <button onClick={() => { sendToBack(); setOpenMenu(null); }} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm fluent-smooth ${menuItemClass}`}><ChevronsDown size={14} />Send To Back</button>
+            <div className="tb-menu absolute bottom-full mb-2 left-0 min-w-48 rounded-xl p-1">
+              <button onClick={() => { bringToFront(); setOpenMenu(null); }} className="tb-menu-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold fluent-smooth"><ChevronsUp size={14} />Bring To Front</button>
+              <button onClick={() => { moveForward(); setOpenMenu(null); }} className="tb-menu-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold fluent-smooth"><ChevronUp size={14} />Move Forward</button>
+              <button onClick={() => { moveBackward(); setOpenMenu(null); }} className="tb-menu-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold fluent-smooth"><ChevronDown size={14} />Move Backward</button>
+              <button onClick={() => { sendToBack(); setOpenMenu(null); }} className="tb-menu-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold fluent-smooth"><ChevronsDown size={14} />Send To Back</button>
             </div>
           )}
         </div>
@@ -173,21 +157,39 @@ const Toolbar = () => {
           <button
             onClick={() => setOpenMenu(openMenu === 'organize' ? null : 'organize')}
             disabled={!hasSelection}
-            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg fluent-smooth cursor-pointer ${
-              hasSelection ? buttonClass : 'opacity-40 cursor-not-allowed'
-            }`}
+            className="tb-button flex items-center gap-1.5 px-2.5 py-2 rounded-lg fluent-smooth cursor-pointer"
             title="Organize"
           >
             <Folder size={16} />
-            <ChevronDown size={13} className={mutedClass} />
+            <ChevronDown size={13} className="tb-icon-dim" />
           </button>
 
           {openMenu === 'organize' && hasSelection && (
-            <div className={`absolute bottom-full mb-2 left-0 min-w-44 rounded-xl p-1 ${menuClass}`}>
-              <button onClick={() => { copy(); paste(); setOpenMenu(null); }} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm fluent-smooth ${menuItemClass}`}><Copy size={14} />Duplicate</button>
-              <button onClick={() => { groupSelectedLayers(); setOpenMenu(null); }} disabled={!canGroup} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm fluent-smooth ${canGroup ? menuItemClass : 'opacity-40 cursor-not-allowed'}`}><Folder size={14} />Group</button>
-              <button onClick={() => { ungroupSelectedLayers(); setOpenMenu(null); }} disabled={!canUngroup} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm fluent-smooth ${canUngroup ? menuItemClass : 'opacity-40 cursor-not-allowed'}`}><X size={14} />Ungroup</button>
-              <button onClick={() => { toggleLockSelected(); setOpenMenu(null); }} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm fluent-smooth ${menuItemClass}`}>{allSelectedLocked ? <Unlock size={14} /> : <Lock size={14} />}{allSelectedLocked ? 'Unlock' : 'Lock'}</button>
+            <div className="tb-menu absolute bottom-full mb-2 left-0 min-w-44 rounded-xl p-1">
+              <button onClick={() => { copy(); paste(); setOpenMenu(null); }} className="tb-menu-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold fluent-smooth"><Copy size={14} />Duplicate</button>
+              <button onClick={() => { createFrameFromSelection(); setOpenMenu(null); }} className="tb-menu-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold fluent-smooth"><Square size={14} />Frame Selection</button>
+              <button onClick={() => { groupSelectedLayers(); setOpenMenu(null); }} disabled={!canGroup} className="tb-menu-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold fluent-smooth"><Folder size={14} />Group</button>
+              <button onClick={() => { ungroupSelectedLayers(); setOpenMenu(null); }} disabled={!canUngroup} className="tb-menu-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold fluent-smooth"><X size={14} />Ungroup</button>
+              <button
+                onClick={() => {
+                  if (selectedFrameId) moveSelectionIntoFrame(selectedFrameId);
+                  setOpenMenu(null);
+                }}
+                disabled={!canMoveIntoFrame}
+                className="tb-menu-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold fluent-smooth"
+              >
+                <Square size={14} />
+                Move Into Frame
+              </button>
+              <button
+                onClick={() => { removeSelectionFromFrame(); setOpenMenu(null); }}
+                disabled={!canRemoveFromFrame}
+                className="tb-menu-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold fluent-smooth"
+              >
+                <X size={14} />
+                Remove From Frame
+              </button>
+              <button onClick={() => { toggleLockSelected(); setOpenMenu(null); }} className="tb-menu-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold fluent-smooth">{allSelectedLocked ? <Unlock size={14} /> : <Lock size={14} />}{allSelectedLocked ? 'Unlock' : 'Lock'}</button>
             </div>
           )}
         </div>
@@ -196,11 +198,7 @@ const Toolbar = () => {
       <button
         onClick={handleDelete}
         disabled={!hasSelection}
-        className={`ml-1 p-2.5 rounded-xl fluent-smooth cursor-pointer ${
-          hasSelection
-            ? 'bg-red-600/18 text-red-500 hover:bg-red-600 hover:text-white'
-            : 'opacity-40 cursor-not-allowed text-zinc-500'
-        }`}
+        className="tb-button tb-danger-btn ml-1 p-2.5 rounded-xl fluent-smooth cursor-pointer"
         title="Delete (Del)"
       >
         <Trash2 size={18} />

@@ -21,7 +21,6 @@ const LayersSidebar = () => {
   } = useStore();
 
   const currentPage = pages.find((page) => page.id === currentPageId) ?? null;
-  const isLight = theme === 'light';
   const layerPage = currentPage ? ensureLayerTree(currentPage) : null;
   const currentShapes = layerPage?.shapes ?? [];
   const currentGroups = layerPage?.groups ?? [];
@@ -57,6 +56,8 @@ const LayersSidebar = () => {
     shape.name ||
     (shape.type === 'image'
       ? 'Image'
+      : shape.type === 'frame'
+        ? 'Frame'
       : shape.type === 'rect'
         ? 'Rectangle'
         : shape.type === 'circle'
@@ -212,13 +213,13 @@ const LayersSidebar = () => {
         draggable
         onDragStart={() => handleDragStart(nodeKey)}
         onDragEnd={handleDragEnd}
-        onDragOver={(event) => handleDragOver(event, nodeKey, false)}
+        onDragOver={(event) => handleDragOver(event, nodeKey, shape.type === 'frame')}
         onDrop={handleDrop}
         onClick={(event) => handleLayerClick(event, shape.id)}
         className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs cursor-pointer fluent-smooth ${
           isSelected
             ? 'bg-blue-600 text-white fluent-depth-8 fluent-glow-blue'
-            : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200 fluent-reveal'
+            : 'ls-row fluent-reveal'
         } ${rowDropClass(nodeKey)}`}
         style={{ marginLeft: depth * 14 }}
       >
@@ -243,7 +244,7 @@ const LayersSidebar = () => {
           className={`p-0.5 rounded fluent-smooth ${
             isSelected
               ? 'text-white/90 hover:text-white hover:bg-white/20'
-              : 'hover:bg-white/10 text-zinc-300 hover:text-white'
+              : 'ls-text-main hover:bg-white/10 hover:text-white'
           }`}
           title={shape.locked ? 'Unlock layer' : 'Lock layer'}
         >
@@ -273,7 +274,7 @@ const LayersSidebar = () => {
           className={`group flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs cursor-pointer fluent-smooth ${
             groupSelected
               ? 'bg-blue-600/20 text-blue-300'
-              : 'text-zinc-300 hover:bg-white/5 hover:text-zinc-100'
+              : 'ls-row'
           } ${rowDropClass(nodeKey)}`}
           style={{ marginLeft: depth * 14 }}
           onClick={(event) => {
@@ -334,7 +335,7 @@ const LayersSidebar = () => {
                   event.stopPropagation();
                   cancelRenameGroup();
                 }}
-                className="p-0.5 text-zinc-500 hover:text-zinc-300 fluent-smooth"
+                className="p-0.5 ls-text-dim hover:text-white fluent-smooth"
                 title="Cancel rename"
               >
                 <X size={11} />
@@ -347,7 +348,7 @@ const LayersSidebar = () => {
                   event.stopPropagation();
                   toggleGroupLock(group.id);
                 }}
-                className="p-0.5 text-zinc-500 hover:text-zinc-200 fluent-smooth"
+                className="p-0.5 ls-text-dim hover:text-white fluent-smooth"
                 title={groupAllLocked ? 'Unlock group' : 'Lock group'}
               >
                 {groupAllLocked ? <Lock size={11} /> : <Unlock size={11} />}
@@ -357,7 +358,7 @@ const LayersSidebar = () => {
                   event.stopPropagation();
                   startRenameGroup(group.id, group.name);
                 }}
-                className="p-0.5 text-zinc-500 hover:text-zinc-200 fluent-smooth"
+                className="p-0.5 ls-text-dim hover:text-white fluent-smooth"
                 title="Rename group"
               >
                 <Pencil size={11} />
@@ -367,7 +368,7 @@ const LayersSidebar = () => {
                   event.stopPropagation();
                   setConfirmDeleteGroupId(group.id);
                 }}
-                className="p-0.5 text-zinc-500 hover:text-red-400 fluent-smooth"
+                className="p-0.5 ls-text-dim hover:text-red-400 fluent-smooth"
                 title="Delete group"
               >
                 <Trash2 size={11} />
@@ -397,58 +398,48 @@ const LayersSidebar = () => {
   if (!leftSidebarVisible) {
     return (
       <div
-        className={`fixed top-4 left-4 w-10 h-10 rounded-lg flex items-center justify-center z-50 cursor-pointer fluent-depth-16 fluent-smooth fluent-reveal ${
-          isLight
-            ? 'border border-slate-300/70 bg-white/85 hover:bg-slate-100/90'
-            : 'border border-white/10 hover:bg-white/5'
-        }`}
+        className="fixed top-4 left-4 w-10 h-10 rounded-lg flex items-center justify-center z-50 cursor-pointer fluent-depth-16 fluent-smooth fluent-reveal border ls-divider ls-row"
         onClick={toggleLeftSidebar}
       >
-        <PanelLeft size={16} className={isLight ? 'text-slate-700' : 'text-white'} />
+        <PanelLeft size={16} className="ls-title" />
       </div>
     );
   }
 
   return (
-    <div className={`layers-sidebar fixed top-4 left-4 w-64 h-[calc(100dvh-32px)] rounded-xl fluent-acrylic premium-panel flex flex-col z-50 select-none overflow-hidden fluent-animate-slide ${isLight ? 'text-slate-700' : ''}`}>
-      <div className={`p-3.5 premium-header flex justify-between items-center ${isLight ? 'border-slate-300/60 bg-linear-to-b from-slate-50/90 to-slate-100/70' : ''}`}>
+    <div className="layers-sidebar fixed top-4 left-4 w-64 h-[calc(100dvh-32px)] rounded-xl fluent-acrylic premium-panel flex flex-col z-50 select-none overflow-hidden fluent-animate-slide">
+      <div className="p-3.5 premium-header flex justify-between items-center">
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 rounded flex items-center justify-center text-[10px] font-black italic">
             <img src={shapeo} alt="Shapeo" loading="lazy" />
           </div>
-          <span className={`text-[11px] font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>SHAPEO</span>
+          <span className="ls-title text-[11px] font-bold tracking-tight">SHAPEO</span>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={toggleTheme}
-            className={`p-1 rounded fluent-smooth fluent-reveal ${
-              isLight ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/80' : 'text-zinc-500 hover:text-white hover:bg-white/5'
-            }`}
+            className="ls-icon-btn p-1 rounded fluent-smooth fluent-reveal"
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
           <button
             onClick={toggleLeftSidebar}
-            className={`p-1 rounded fluent-smooth fluent-reveal ${
-              isLight ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/80' : 'text-zinc-500 hover:text-white hover:bg-white/5'
-            }`}
+            className="ls-icon-btn p-1 rounded fluent-smooth fluent-reveal"
           >
             <PanelLeft size={16} />
           </button>
         </div>
       </div>
 
-      <div className="px-2 py-4 border-b border-white/5">
-        <div className="flex justify-between items-center mb-2 px-2 text-zinc-500">
-          <span className={`text-[10px] font-bold uppercase tracking-widest ${isLight ? 'text-slate-700' : 'text-white'}`}>Pages</span>
+      <div className="px-2 py-4 border-b ls-divider">
+        <div className="flex justify-between items-center mb-2 px-2 ls-text-muted">
+          <span className="ls-title text-[10px] font-bold uppercase tracking-widest">Pages</span>
           <button
             onClick={addPage}
-            className={`p-1 rounded fluent-smooth fluent-reveal ${
-              isLight ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/80' : 'hover:bg-white/5 hover:text-white'
-            }`}
+            className="ls-icon-btn p-1 rounded fluent-smooth fluent-reveal"
           >
-            <Plus size={14} className={isLight ? 'text-slate-700' : 'text-white'} />
+            <Plus size={14} />
           </button>
         </div>
         {pages.map((page) => (
@@ -458,7 +449,7 @@ const LayersSidebar = () => {
               className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md text-xs cursor-pointer fluent-smooth ${
                 currentPageId === page.id
                   ? 'bg-blue-600/10 text-blue-400 fluent-reveal'
-                  : 'text-zinc-400 hover:bg-white/5 fluent-reveal'
+                  : 'ls-row fluent-reveal'
               }`}
             >
               <FileText size={12} />
@@ -502,7 +493,7 @@ const LayersSidebar = () => {
                     event.stopPropagation();
                     cancelRenamePage();
                   }}
-                  className="p-1 text-zinc-500 hover:text-zinc-300 fluent-smooth"
+                  className="p-1 ls-text-dim hover:text-white fluent-smooth"
                   title="Cancel rename"
                 >
                   <X size={12} />
@@ -514,7 +505,7 @@ const LayersSidebar = () => {
                   event.stopPropagation();
                   startRenamePage(page.id, page.name);
                 }}
-                className="opacity-0 group-hover:opacity-100 p-1.5 text-zinc-600 hover:text-zinc-200 fluent-smooth fluent-reveal"
+                className="opacity-0 group-hover:opacity-100 p-1.5 ls-text-dim hover:text-white fluent-smooth fluent-reveal"
                 title="Rename page"
               >
                 <Pencil size={12} />
@@ -526,7 +517,7 @@ const LayersSidebar = () => {
                   event.stopPropagation();
                   setConfirmDeleteId(page.id);
                 }}
-                className="opacity-0 group-hover:opacity-100 p-1.5 text-zinc-600 hover:text-red-400 fluent-smooth fluent-reveal"
+                className="opacity-0 group-hover:opacity-100 p-1.5 ls-text-dim hover:text-red-400 fluent-smooth fluent-reveal"
                 title="Delete page"
               >
                 <Trash2 size={12} />
@@ -537,8 +528,8 @@ const LayersSidebar = () => {
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex justify-between items-center px-4 py-3 text-zinc-500">
-          <span className={`text-[10px] font-bold uppercase tracking-widest ${isLight ? 'text-slate-700' : 'text-white'}`}>Layers</span>
+        <div className="flex justify-between items-center px-4 py-3 ls-text-muted">
+          <span className="ls-title text-[10px] font-bold uppercase tracking-widest">Layers</span>
           <div className="flex items-center gap-1">
             <input
               type="file"
@@ -549,40 +540,26 @@ const LayersSidebar = () => {
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className={`p-1 rounded fluent-smooth fluent-reveal ${
-                isLight ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/80' : 'hover:bg-white/5 hover:text-white'
-              }`}
+              className="ls-icon-btn p-1 rounded fluent-smooth fluent-reveal"
               title="Upload Image"
             >
-              <Upload size={14} className={isLight ? 'text-slate-700' : 'text-white'} />
+              <Upload size={14} />
             </button>
             <button
               onClick={groupSelectedLayers}
               disabled={!canGroup}
-              className={`p-1 rounded fluent-smooth ${
-                canGroup
-                  ? isLight
-                    ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/80'
-                    : 'hover:bg-white/5 hover:text-white'
-                  : 'opacity-40 cursor-not-allowed'
-              }`}
+              className="ls-icon-btn p-1 rounded fluent-smooth"
               title="Group selected layers"
             >
-              <Folder size={14} className={isLight ? 'text-slate-700' : 'text-white'} />
+              <Folder size={14} />
             </button>
             <button
               onClick={ungroupSelectedLayers}
               disabled={!canUngroup}
-              className={`p-1 rounded fluent-smooth ${
-                canUngroup
-                  ? isLight
-                    ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/80'
-                    : 'hover:bg-white/5 hover:text-white'
-                  : 'opacity-40 cursor-not-allowed'
-              }`}
+              className="ls-icon-btn p-1 rounded fluent-smooth"
               title="Ungroup selected layers"
             >
-              <X size={14} className={isLight ? 'text-slate-700' : 'text-white'} />
+              <X size={14} />
             </button>
           </div>
         </div>
@@ -596,7 +573,7 @@ const LayersSidebar = () => {
           onDragLeave={() => setRootDropActive(false)}
         >
           {currentShapes.length === 0 ? (
-            <div className="h-32 flex flex-col items-center justify-center border-2 border-dashed border-zinc-800 rounded-lg mx-2 opacity-20">
+            <div className="h-32 flex flex-col items-center justify-center border-2 border-dashed ls-divider rounded-lg mx-2 opacity-30 ls-text-muted">
               <Layout size={24} />
               <span className="text-[9px] mt-2 font-bold uppercase">Empty Page</span>
             </div>

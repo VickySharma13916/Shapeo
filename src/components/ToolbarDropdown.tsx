@@ -27,10 +27,9 @@ const ToolbarDropdown = ({
   triggerTitle,
   className = '',
 }: ToolbarDropdownProps) => {
+  void theme;
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const isLight = theme === 'light';
-
   const activeTool = options.find(opt => opt.id === activeToolId) || options[0];
 
   // Close dropdown when clicking outside
@@ -77,11 +76,7 @@ const ToolbarDropdown = ({
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-1 px-2.5 py-2 rounded-lg fluent-smooth cursor-pointer border ${
-          isLight
-            ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
-            : 'bg-zinc-800/70 border-white/10 text-zinc-100 hover:bg-zinc-700/80'
-        }`}
+        className="tb-button flex items-center gap-1 px-2.5 py-2 rounded-lg fluent-smooth cursor-pointer border tb-group"
         title={triggerTitle || `${activeTool.label}${activeTool.shortcut ? ` (${activeTool.shortcut})` : ''}`}
       >
         {triggerIcon || activeTool.icon}
@@ -90,31 +85,23 @@ const ToolbarDropdown = ({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className={`absolute bottom-full left-0 mb-2 min-w-50 rounded-xl overflow-hidden z-50 fluent-animate-in border ${
-          isLight
-            ? 'bg-white/95 border-slate-300 shadow-[0_16px_36px_rgba(15,23,42,0.18)]'
-            : 'fluent-acrylic border-white/10 fluent-depth-32'
-        }`}>
+        <div className="tb-menu absolute bottom-full left-0 mb-2 min-w-50 rounded-xl overflow-hidden z-50 fluent-animate-in border">
           {options.map((option) => (
             <button
               key={option.id}
               onClick={() => handleToolClick(option)}
-              className={`w-full flex items-center justify-between px-4 py-3 text-left fluent-smooth cursor-pointer ${
-                option.id === activeToolId
-                  ? 'bg-blue-600/20 text-blue-500'
-                  : isLight
-                    ? 'text-slate-700 hover:bg-slate-100'
-                    : 'text-zinc-300 hover:bg-white/5 fluent-reveal'
+              className={`tb-menu-item w-full flex items-center justify-between px-4 py-2.5 text-left text-xs font-semibold fluent-smooth cursor-pointer ${
+                option.id === activeToolId ? 'bg-blue-600/20 text-blue-500' : ''
               }`}
             >
               <div className="flex items-center gap-3">
-                <div className={option.id === activeToolId ? 'text-blue-500' : (isLight ? 'text-slate-500' : 'text-zinc-400')}>
+                <div className={option.id === activeToolId ? 'text-blue-500' : 'tb-icon-dim'}>
                   {option.icon}
                 </div>
-                <span className="text-sm font-medium">{option.label}</span>
+                <span>{option.label}</span>
               </div>
               {option.shortcut && (
-                <span className={`text-xs font-mono ${isLight ? 'text-slate-500' : 'text-zinc-500'}`}>{option.shortcut}</span>
+                <span className="text-[11px] font-mono tb-icon-dim">{option.shortcut}</span>
               )}
               {option.id === activeToolId && (
                 <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500" />

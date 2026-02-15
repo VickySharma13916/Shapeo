@@ -25,7 +25,7 @@ const Canvas = () => {
 
   const { camera } = useCamera(canvasRef);
   const {
-    selectedIds, setSelectedIds, toggleSelection, updateShape, mode, theme, showGrid, setCamera, saveHistory, currentPageId, pages, bringToFront,
+    selectedIds, setSelectedIds, toggleSelection, updateShape, mode, theme, showGrid, pixelSnapEnabled, setCamera, saveHistory, currentPageId, pages, bringToFront,
   } = useStore();
 
   const shapes = useMemo(
@@ -115,20 +115,82 @@ const Canvas = () => {
         ? shapes.find((shape) => shape.id === selectedIds[0]) ?? null
         : null;
 
+    const selectedShapes = shapes.filter((shape) => selectedIds.includes(shape.id));
+    const multiSelectionCursor =
+      selectedShapes.length > 1
+        ? (() => {
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+            selectedShapes.forEach((shape) => {
+              const bounds =
+                shape.type === 'line'
+                  ? {
+                      minX: Math.min(shape.x, shape.x2),
+                      minY: Math.min(shape.y, shape.y2),
+                      maxX: Math.max(shape.x, shape.x2),
+                      maxY: Math.max(shape.y, shape.y2),
+                    }
+                  : {
+                      minX: Math.min(shape.x, shape.x + shape.width),
+                      minY: Math.min(shape.y, shape.y + shape.height),
+                      maxX: Math.max(shape.x, shape.x + shape.width),
+                      maxY: Math.max(shape.y, shape.y + shape.height),
+                    };
+              minX = Math.min(minX, bounds.minX);
+              minY = Math.min(minY, bounds.minY);
+              maxX = Math.max(maxX, bounds.maxX);
+              maxY = Math.max(maxY, bounds.maxY);
+            });
+            const handleX = (minX + maxX) / 2;
+            const handleY = minY - 30 / camera.zoom;
+            const pivot = interactionRef.current.selectionPivot ?? {
+              x: (minX + maxX) / 2,
+              y: (minY + maxY) / 2,
+            };
+            const threshold = 10 / camera.zoom;
+            const cornerThreshold = 8 / camera.zoom;
+            const corners = [
+              { x: minX, y: minY, cursor: 'nwse-resize' },
+              { x: maxX, y: minY, cursor: 'nesw-resize' },
+              { x: minX, y: maxY, cursor: 'nesw-resize' },
+              { x: maxX, y: maxY, cursor: 'nwse-resize' },
+            ];
+            const cornerHit = corners.find(
+              (c) =>
+                Math.abs(worldPos.x - c.x) <= cornerThreshold &&
+                Math.abs(worldPos.y - c.y) <= cornerThreshold
+            );
+            if (cornerHit) return cornerHit.cursor;
+            const isOverRotateHandle =
+              Math.abs(worldPos.x - handleX) <= threshold &&
+              Math.abs(worldPos.y - handleY) <= threshold;
+            const isOverPivot =
+              Math.abs(worldPos.x - pivot.x) <= threshold &&
+              Math.abs(worldPos.y - pivot.y) <= threshold;
+            if (isOverPivot) return 'move';
+            return isOverRotateHandle ? 'grab' : 'default';
+          })()
+        : null;
+
     setCursor(
-      getCanvasCursor({
-        mode,
-        selectedShape,
-        worldPos,
-        zoom: camera.zoom,
-      })
+      multiSelectionCursor ??
+        getCanvasCursor({
+          mode,
+          selectedShape,
+          worldPos,
+          zoom: camera.zoom,
+        })
     );
 
     const result = handlePointerMove({
       worldPos,
       movement: { x: event.movementX, y: event.movementY },
+      shiftKey: event.shiftKey,
       camera,
       mode,
+      pixelSnapEnabled,
       shapes,
       selectedIds,
       state: interactionRef.current,
@@ -168,6 +230,12 @@ const Canvas = () => {
   }, []);
 
   useEffect(() => {
+    if (selectedIds.length <= 1) {
+      interactionRef.current.selectionPivot = null;
+    }
+  }, [selectedIds]);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) {
       return;
@@ -194,6 +262,7 @@ const Canvas = () => {
       marqueeRect,
       smartGuides,
       theme,
+      selectionPivot: interactionRef.current.selectionPivot,
     });
   }, [camera, shapes, groups, selectedIds, showGrid, marqueeRect, smartGuides, imageRenderTick, theme]);
 

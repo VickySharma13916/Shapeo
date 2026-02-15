@@ -329,16 +329,32 @@ export const moveLayerNode = (
 
   let destParentGroupId: string | null = null;
   let destIndex = 0;
+  let targetFrameId: string | undefined;
 
   if (position === 'inside') {
-    if (target.kind !== 'group') {
-      return { page, changed: false };
+    if (target.kind === 'group') {
+      destParentGroupId = target.id;
+      destIndex = getChildren(nextPage, destParentGroupId).length;
+    } else {
+      const targetShape = nextPage.shapes.find((shape) => shape.id === target.id);
+      if (!targetShape || targetShape.type !== 'frame') {
+        return { page, changed: false };
+      }
+      const parentChildren = getChildren(nextPage, targetLoc.parentGroupId);
+      destParentGroupId = targetLoc.parentGroupId;
+      destIndex = targetLoc.index + 1;
+      targetFrameId = targetShape.id;
+      if (parentChildren.length === 0) {
+        return { page, changed: false };
+      }
     }
-    destParentGroupId = target.id;
-    destIndex = getChildren(nextPage, destParentGroupId).length;
   } else {
     destParentGroupId = targetLoc.parentGroupId;
     destIndex = position === 'before' ? targetLoc.index : targetLoc.index + 1;
+    if (target.kind === 'shape') {
+      const targetShape = nextPage.shapes.find((shape) => shape.id === target.id);
+      targetFrameId = targetShape?.frameId;
+    }
   }
 
   if (drag.kind === 'group' && destParentGroupId) {
@@ -364,20 +380,35 @@ export const moveLayerNode = (
     nextPage = {
       ...nextPage,
       shapes: nextPage.shapes.map((shape) =>
-        shape.id === drag.id ? { ...shape, groupId: destParentGroupId ?? undefined } : shape
+        shape.id === drag.id
+          ? {
+              ...shape,
+              groupId: destParentGroupId ?? undefined,
+              frameId: targetFrameId,
+            }
+          : shape
       ),
     };
   } else {
+    const descendantShapeIds = gatherGroupDescendants(nextPage, drag.id).shapeIds;
     nextPage = {
       ...nextPage,
       groups: (nextPage.groups ?? []).map((group) =>
         group.id === drag.id ? { ...group, parentGroupId: destParentGroupId ?? undefined } : group
       ),
+      shapes: nextPage.shapes.map((shape) =>
+        descendantShapeIds.has(shape.id) ? { ...shape, frameId: targetFrameId } : shape
+      ),
     };
   }
 
   const reorderedShapes = flattenShapesByTree(nextPage);
+  const shapeMetaChanged = page.shapes.some((shape) => {
+    const next = nextPage.shapes.find((candidate) => candidate.id === shape.id);
+    return next && (next.groupId !== shape.groupId || next.frameId !== shape.frameId);
+  });
   const changed =
+    shapeMetaChanged ||
     reorderedShapes.some((shape, index) => shape.id !== page.shapes[index]?.id) ||
     JSON.stringify(page.rootLayerIds ?? []) !== JSON.stringify(nextPage.rootLayerIds ?? []) ||
     JSON.stringify(page.groups ?? []) !== JSON.stringify(nextPage.groups ?? []);
@@ -414,20 +445,29 @@ export const moveLayerNodeToRootEnd = (
     nextPage = {
       ...nextPage,
       shapes: nextPage.shapes.map((shape) =>
-        shape.id === drag.id ? { ...shape, groupId: undefined } : shape
+        shape.id === drag.id ? { ...shape, groupId: undefined, frameId: undefined } : shape
       ),
     };
   } else {
+    const descendantShapeIds = gatherGroupDescendants(nextPage, drag.id).shapeIds;
     nextPage = {
       ...nextPage,
       groups: (nextPage.groups ?? []).map((group) =>
         group.id === drag.id ? { ...group, parentGroupId: undefined } : group
       ),
+      shapes: nextPage.shapes.map((shape) =>
+        descendantShapeIds.has(shape.id) ? { ...shape, frameId: undefined } : shape
+      ),
     };
   }
 
   const reorderedShapes = flattenShapesByTree(nextPage);
+  const shapeMetaChanged = page.shapes.some((shape) => {
+    const next = nextPage.shapes.find((candidate) => candidate.id === shape.id);
+    return next && (next.groupId !== shape.groupId || next.frameId !== shape.frameId);
+  });
   const changed =
+    shapeMetaChanged ||
     reorderedShapes.some((shape, index) => shape.id !== page.shapes[index]?.id) ||
     JSON.stringify(page.rootLayerIds ?? []) !== JSON.stringify(nextPage.rootLayerIds ?? []) ||
     JSON.stringify(page.groups ?? []) !== JSON.stringify(nextPage.groups ?? []);

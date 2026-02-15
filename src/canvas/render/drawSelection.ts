@@ -180,7 +180,7 @@ export const drawSelection = ({ ctx, shape, selectedIds, zoom }: DrawSelectionIn
       ctx.stroke();
     });
 
-    if (shape.type === 'rect') {
+    if (shape.type === 'rect' || shape.type === 'frame') {
       const radiusPositions = [
         { x: shape.x + rMargin, y: shape.y + rMargin },
         { x: shape.x + shape.width - rMargin, y: shape.y + rMargin },

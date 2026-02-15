@@ -33,7 +33,11 @@ export function isPointInShape(point: Point, shape: Shape): boolean {
   const localY = cy + (dx * sin + dy * cos);
 
   // 2. Check based on shape type
-  if (shape.type === ShapeType.Rectangle || shape.type === ShapeType.Image) {
+  if (
+    shape.type === ShapeType.Rectangle ||
+    shape.type === ShapeType.Frame ||
+    shape.type === ShapeType.Image
+  ) {
     return (
       localX >= x &&
       localX <= x + width &&

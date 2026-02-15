@@ -2,7 +2,8 @@ import type { Shape } from './types';
 
 const loadImage = (shape: Extract<Shape, { type: 'image' }>): Promise<HTMLImageElement | null> =>
   new Promise((resolve) => {
-    if (shape.imageElement instanceof HTMLImageElement) {
+    const canCheckHtmlImageElement = typeof HTMLImageElement !== 'undefined';
+    if (canCheckHtmlImageElement && shape.imageElement instanceof HTMLImageElement) {
       if (shape.imageElement.complete && shape.imageElement.naturalWidth > 0) {
         resolve(shape.imageElement);
         return;

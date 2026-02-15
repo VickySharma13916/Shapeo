@@ -17,8 +17,8 @@ type DragUpdate = {
 type DragUpdatesInput = {
   worldPos: Point;
   shapes: Shape[];
-  selectedIds: string[];
   dragOffsetById: InteractionState['dragOffsetById'];
+  snapEnabled: boolean;
   snapToGrid: (value: number) => number;
 };
 
@@ -30,12 +30,13 @@ type DragUpdatesResult = {
 export const getDragUpdates = ({
   worldPos,
   shapes,
-  selectedIds,
   dragOffsetById,
+  snapEnabled,
   snapToGrid,
 }: DragUpdatesInput): DragUpdatesResult => {
+  const dragIds = Object.keys(dragOffsetById);
   const draggedShapes = shapes.filter(
-    (shape) => selectedIds.includes(shape.id) && !shape.locked
+    (shape) => dragIds.includes(shape.id) && !shape.locked
   );
   if (draggedShapes.length === 0) {
     return null;
@@ -72,7 +73,7 @@ export const getDragUpdates = ({
   const { guides, snapOffset } = findSmartGuides(tempShapes, shapes);
 
   const updates: DragUpdate[] = [];
-  selectedIds.forEach((id) => {
+  dragIds.forEach((id) => {
     const shape = shapes.find((candidate) => candidate.id === id);
     const dragOffset = dragOffsetById[id];
     if (!shape || !dragOffset) {
@@ -88,10 +89,10 @@ export const getDragUpdates = ({
       updates.push({
         id,
         updates: {
-          x: snapToGrid(newX),
-          y: snapToGrid(newY),
-          x2: snapToGrid(shape.x2 + deltaX),
-          y2: snapToGrid(shape.y2 + deltaY),
+          x: snapEnabled ? snapToGrid(newX) : newX,
+          y: snapEnabled ? snapToGrid(newY) : newY,
+          x2: snapEnabled ? snapToGrid(shape.x2 + deltaX) : shape.x2 + deltaX,
+          y2: snapEnabled ? snapToGrid(shape.y2 + deltaY) : shape.y2 + deltaY,
         },
       });
       return;
@@ -99,7 +100,10 @@ export const getDragUpdates = ({
 
     updates.push({
       id,
-      updates: { x: snapToGrid(newX), y: snapToGrid(newY) },
+      updates: {
+        x: snapEnabled ? snapToGrid(newX) : newX,
+        y: snapEnabled ? snapToGrid(newY) : newY,
+      },
     });
   });
 

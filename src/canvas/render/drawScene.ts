@@ -25,6 +25,42 @@ type DrawSceneInput = {
   marqueeRect: MarqueeRect | null;
   smartGuides: AlignmentGuide[];
   theme: 'dark' | 'light';
+  selectionPivot?: { x: number; y: number } | null;
+};
+
+const getFrameAncestors = (shape: Shape, frameById: Map<string, Shape>): Shape[] => {
+  const ancestors: Shape[] = [];
+  const visited = new Set<string>();
+  let currentFrameId = shape.frameId;
+
+  while (currentFrameId && !visited.has(currentFrameId)) {
+    visited.add(currentFrameId);
+    const frame = frameById.get(currentFrameId);
+    if (!frame || frame.type !== 'frame') break;
+    ancestors.unshift(frame);
+    currentFrameId = frame.frameId;
+  }
+
+  return ancestors;
+};
+
+const applyFrameClipPath = (ctx: CanvasRenderingContext2D, frame: Shape) => {
+  const radius = frame.type === 'frame' ? frame.cornerRadius ?? 0 : 0;
+  const centerX = frame.x + frame.width / 2;
+  const centerY = frame.y + frame.height / 2;
+
+  ctx.save();
+  if (frame.rotation && frame.rotation !== 0) {
+    ctx.translate(centerX, centerY);
+    ctx.rotate((frame.rotation * Math.PI) / 180);
+    ctx.translate(-centerX, -centerY);
+  }
+
+  ctx.beginPath();
+  if (radius > 0) ctx.roundRect(frame.x, frame.y, frame.width, frame.height, radius);
+  else ctx.rect(frame.x, frame.y, frame.width, frame.height);
+  ctx.restore();
+  ctx.clip();
 };
 
 const getShapeBounds = (shape: Shape) => {
@@ -145,6 +181,86 @@ const drawLockBadge = (
   ctx.fill();
 };
 
+const drawMultiSelectionFrame = (
+  ctx: CanvasRenderingContext2D,
+  shapes: Shape[],
+  selectedIds: string[],
+  zoom: number,
+  pivot?: { x: number; y: number } | null
+) => {
+  if (selectedIds.length <= 1) return;
+  const selectedShapes = shapes.filter((shape) => selectedIds.includes(shape.id));
+  if (selectedShapes.length === 0) return;
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  selectedShapes.forEach((shape) => {
+    const bounds = getShapeBounds(shape);
+    minX = Math.min(minX, bounds.minX);
+    minY = Math.min(minY, bounds.minY);
+    maxX = Math.max(maxX, bounds.maxX);
+    maxY = Math.max(maxY, bounds.maxY);
+  });
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const handleSize = 8 / zoom;
+  const rotationHandleDistance = 30 / zoom;
+  const rotationHandleSize = 5 / zoom;
+
+  ctx.strokeStyle = '#3b82f6';
+  ctx.lineWidth = 1 / zoom;
+  ctx.beginPath();
+  ctx.rect(minX, minY, width, height);
+  ctx.stroke();
+
+  const corners = [
+    { x: minX, y: minY },
+    { x: maxX, y: minY },
+    { x: minX, y: maxY },
+    { x: maxX, y: maxY },
+  ];
+
+  ctx.fillStyle = 'white';
+  ctx.strokeStyle = '#3b82f6';
+  corners.forEach((corner) => {
+    ctx.beginPath();
+    ctx.rect(corner.x - handleSize / 2, corner.y - handleSize / 2, handleSize, handleSize);
+    ctx.fill();
+    ctx.stroke();
+  });
+
+  const handleX = minX + width / 2;
+  const handleY = minY - rotationHandleDistance;
+  ctx.beginPath();
+  ctx.moveTo(handleX, minY);
+  ctx.lineTo(handleX, handleY);
+  ctx.strokeStyle = '#3b82f6';
+  ctx.lineWidth = 1.5 / zoom;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(handleX, handleY, rotationHandleSize, 0, Math.PI * 2);
+  ctx.fillStyle = 'white';
+  ctx.strokeStyle = '#3b82f6';
+  ctx.fill();
+  ctx.stroke();
+
+  const pivotPoint = pivot ?? { x: minX + width / 2, y: minY + height / 2 };
+  ctx.beginPath();
+  ctx.arc(pivotPoint.x, pivotPoint.y, 4 / zoom, 0, Math.PI * 2);
+  ctx.fillStyle = '#3b82f6';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(pivotPoint.x, pivotPoint.y, 7 / zoom, 0, Math.PI * 2);
+  ctx.strokeStyle = '#3b82f6';
+  ctx.lineWidth = 1 / zoom;
+  ctx.stroke();
+};
+
 const drawLockedBadges = (
   ctx: CanvasRenderingContext2D,
   shapes: Shape[],
@@ -226,6 +342,7 @@ export const drawScene = ({
   marqueeRect,
   smartGuides,
   theme,
+  selectionPivot,
 }: DrawSceneInput) => {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
@@ -255,9 +372,24 @@ export const drawScene = ({
     ctx.stroke();
   }
 
+  const frameById = new Map(
+    shapes
+      .filter((shape) => shape.type === 'frame')
+      .map((shape) => [shape.id, shape])
+  );
+
   shapes.forEach((shape) => {
     ctx.save();
     ctx.globalAlpha = shape.opacity ?? 1;
+
+    if (shape.frameId) {
+      const ancestors = getFrameAncestors(shape, frameById);
+      ancestors.forEach((frame) => {
+        if (frame.type === 'frame' && frame.clipContent) {
+          applyFrameClipPath(ctx, frame);
+        }
+      });
+    }
 
     if (shape.rotation && shape.rotation !== 0) {
       const centerX = shape.x + shape.width / 2;
@@ -293,6 +425,7 @@ export const drawScene = ({
   }
 
   drawMultiSelectionDimensions(ctx, shapes, selectedIds, camera.zoom);
+  drawMultiSelectionFrame(ctx, shapes, selectedIds, camera.zoom, selectionPivot);
   drawLockedBadges(ctx, shapes, groups, camera.zoom);
 
   ctx.restore();

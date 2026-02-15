@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 import { useStore } from '../store/useStore';
 import { getVisibleLayerShapeIds } from '../store/layerTree';
+import { ShapeType } from '../engine/types';
 
 import type { Shape } from '../engine/types';
 
@@ -10,7 +11,7 @@ export const useKeyboard = () => {
   const {
     copy, paste, deleteShapes, selectedIds, setSelectedIds, undo, redo, cut, setMode, pages, currentPageId, updateShape, 
     saveHistory, toggleRightSidebar, toggleLeftSidebar, moveForward, moveBackward, bringToFront, sendToBack, groupSelectedLayers, 
-    ungroupSelectedLayers, toggleLockSelected,
+    ungroupSelectedLayers, toggleLockSelected, addShape,
   } = useStore();
 
   useEffect(() => {
@@ -135,6 +136,9 @@ export const useKeyboard = () => {
       if (key === 'h' && !isMod) {
         setMode('pan');
       }
+      if (key === 'f' && !isMod) {
+        addShape(ShapeType.Frame);
+      }
 
       if (isMod && e.key === '\\') {
         e.preventDefault();
@@ -186,6 +190,6 @@ export const useKeyboard = () => {
   }, [
     copy, paste, deleteShapes, selectedIds, setSelectedIds, undo, redo, cut, setMode, pages, currentPageId, updateShape, 
     saveHistory, toggleLeftSidebar, toggleRightSidebar, moveForward, moveBackward, bringToFront, sendToBack, groupSelectedLayers, 
-    ungroupSelectedLayers, toggleLockSelected,
+    ungroupSelectedLayers, toggleLockSelected, addShape,
   ]);
 };

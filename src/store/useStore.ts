@@ -5,6 +5,7 @@ import { ShapeType } from '../engine/types';
 import type { Mode, Shape, Page } from '../engine/types';
 
 import { duplicateShapeForPaste } from './clipboard';
+import { applyAutoLayoutToShapes, getFrameAutoLayoutMinSize } from './autoLayout';
 
 import {
   deleteGroupBranch, ensureLayerTree, getGroupDescendantShapeIds, groupShapes, moveLayerNode as moveLayerNodeInTree, 
@@ -56,6 +57,7 @@ interface SceneState {
   mode: Mode;
   theme: ThemeMode;
   showGrid: boolean;
+  pixelSnapEnabled: boolean;
   
   // --- UI & Clipboard ---
   clipboard: Shape[] | null;
@@ -73,6 +75,7 @@ interface SceneState {
   setMode: (mode: Mode) => void;
   toggleTheme: () => void;
   toggleGrid: () => void;
+  togglePixelSnap: () => void;
   toggleLeftSidebar: () => void;
   toggleRightSidebar: () => void;
   
@@ -93,6 +96,9 @@ interface SceneState {
   moveForward: () => void;
   moveBackward: () => void;
   centerObject: (id: string) => void;
+  createFrameFromSelection: () => void;
+  moveSelectionIntoFrame: (frameId: string) => void;
+  removeSelectionFromFrame: () => void;
   groupSelectedLayers: () => void;
   ungroupSelectedLayers: () => void;
   renameGroup: (groupId: string, name: string) => void;
@@ -144,6 +150,7 @@ export const useStore = create<SceneState>()(
       mode: 'select',
       theme: 'dark',
       showGrid: false,
+      pixelSnapEnabled: true,
       history: [
         createHistoryEntry({
           pages: initialPages,
@@ -171,6 +178,8 @@ export const useStore = create<SceneState>()(
       toggleTheme: () =>
         set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
       toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
+      togglePixelSnap: () =>
+        set((state) => ({ pixelSnapEnabled: !state.pixelSnapEnabled })),
       toggleLeftSidebar: () => set((state) => ({ leftSidebarVisible: !state.leftSidebarVisible })),
       toggleRightSidebar: () => set((state) => ({ rightSidebarVisible: !state.rightSidebarVisible })),
 
@@ -263,6 +272,28 @@ export const useStore = create<SceneState>()(
             strokeWidth: 1,
             rotation: 0,
           };
+        } else if (type === ShapeType.Frame) {
+          newShape = {
+            id: newId,
+            name: 'Frame',
+            type: 'frame',
+            x: centerX - 120,
+            y: centerY - 90,
+            locked: false,
+            width: 240,
+            height: 180,
+            fill: theme === 'dark' ? '#111827' : '#eef2ff',
+            stroke: defaultStroke,
+            strokeWidth: 1,
+            rotation: 0,
+            clipContent: true,
+            layoutMode: 'none',
+            layoutGap: 12,
+            layoutPadding: { top: 16, right: 16, bottom: 16, left: 16 },
+            primaryAxisAlign: 'start',
+            crossAxisAlign: 'start',
+            cornerRadius: 8,
+          };
         } else {
           newShape = {
             id: newId, name: type === ShapeType.Image ? 'Image' : 'Rectangle', type, x: centerX - 50, y: centerY - 50,
@@ -285,7 +316,7 @@ export const useStore = create<SceneState>()(
         set((state) => {
           const updatedPages = state.pages.map(p => p.id === state.currentPageId ? {
             ...p,
-            shapes: p.shapes.map(s => {
+            shapes: applyAutoLayoutToShapes(p.shapes.map(s => {
               if (s.id !== id) return s;
               if (s.locked) return s;
               
@@ -311,13 +342,15 @@ export const useStore = create<SceneState>()(
                   lineShape.width = Math.abs(lineShape.x2 - lineShape.x);
                   lineShape.height = Math.abs(lineShape.y2 - lineShape.y);
                 }
+              } else if (updatedShape.type === 'frame') {
+                const frame = updatedShape as Extract<Shape, { type: 'frame' }>;
+                const minSize = getFrameAutoLayoutMinSize(frame, p.shapes);
+                frame.width = Math.max(minSize.minWidth, frame.width);
+                frame.height = Math.max(minSize.minHeight, frame.height);
               }
               
               return updatedShape as Shape;
-            })
-
-
-
+            }))
           } : p);
           return { pages: updatedPages };
         });
@@ -335,10 +368,19 @@ export const useStore = create<SceneState>()(
           const groups = (p.groups ?? []).filter((group) =>
             nextShapes.some((shape) => shape.groupId === group.id)
           );
+          const frameIds = new Set(
+            nextShapes.filter((shape) => shape.type === ShapeType.Frame).map((shape) => shape.id)
+          );
           const cleanedShapes = nextShapes.map((shape) =>
-            shape.groupId && !groups.some((group) => group.id === shape.groupId)
-              ? { ...shape, groupId: undefined }
-              : shape
+            ({
+              ...shape,
+              ...(shape.groupId && !groups.some((group) => group.id === shape.groupId)
+                ? { groupId: undefined }
+                : {}),
+              ...(shape.frameId && !frameIds.has(shape.frameId)
+                ? { frameId: undefined }
+                : {}),
+            })
           );
           return { ...p, shapes: cleanedShapes, groups };
         });
@@ -357,7 +399,10 @@ export const useStore = create<SceneState>()(
           const reordered = bringSelectedToFront(treePage.shapes, selectedIds);
           changed = reordered.changed;
           if (!changed) return treePage;
-          return ensureLayerTree({ ...treePage, shapes: reordered.shapes });
+          return ensureLayerTree({
+            ...treePage,
+            shapes: applyAutoLayoutToShapes(reordered.shapes),
+          });
         });
         if (!changed) return;
         set({ pages: updatedPages });
@@ -374,7 +419,10 @@ export const useStore = create<SceneState>()(
           const reordered = sendSelectedToBack(treePage.shapes, selectedIds);
           changed = reordered.changed;
           if (!changed) return treePage;
-          return ensureLayerTree({ ...treePage, shapes: reordered.shapes });
+          return ensureLayerTree({
+            ...treePage,
+            shapes: applyAutoLayoutToShapes(reordered.shapes),
+          });
         });
         if (!changed) return;
         set({ pages: updatedPages });
@@ -391,7 +439,10 @@ export const useStore = create<SceneState>()(
           const reordered = moveSelectedForward(treePage.shapes, selectedIds);
           changed = reordered.changed;
           if (!changed) return treePage;
-          return ensureLayerTree({ ...treePage, shapes: reordered.shapes });
+          return ensureLayerTree({
+            ...treePage,
+            shapes: applyAutoLayoutToShapes(reordered.shapes),
+          });
         });
         if (!changed) return;
         set({ pages: updatedPages });
@@ -408,7 +459,10 @@ export const useStore = create<SceneState>()(
           const reordered = moveSelectedBackward(treePage.shapes, selectedIds);
           changed = reordered.changed;
           if (!changed) return treePage;
-          return ensureLayerTree({ ...treePage, shapes: reordered.shapes });
+          return ensureLayerTree({
+            ...treePage,
+            shapes: applyAutoLayoutToShapes(reordered.shapes),
+          });
         });
         if (!changed) return;
         set({ pages: updatedPages });
@@ -427,6 +481,140 @@ export const useStore = create<SceneState>()(
             y: (window.innerHeight / 2) - (shape.y + shape.height / 2) * camera.zoom,
           }
         });
+      },
+
+      createFrameFromSelection: () => {
+        const { pages, currentPageId, selectedIds, theme, saveHistory } = get();
+        if (selectedIds.length === 0) return;
+
+        let changed = false;
+        let createdFrameId: string | null = null;
+        const updatedPages = pages.map((page) => {
+          if (page.id !== currentPageId) return page;
+
+          const selectedSet = new Set(selectedIds);
+          const selectedShapes = page.shapes.filter((shape) => selectedSet.has(shape.id));
+          if (selectedShapes.length === 0) return page;
+
+          let minX = Infinity;
+          let minY = Infinity;
+          let maxX = -Infinity;
+          let maxY = -Infinity;
+
+          selectedShapes.forEach((shape) => {
+            if (shape.type === 'line') {
+              minX = Math.min(minX, shape.x, shape.x2);
+              minY = Math.min(minY, shape.y, shape.y2);
+              maxX = Math.max(maxX, shape.x, shape.x2);
+              maxY = Math.max(maxY, shape.y, shape.y2);
+              return;
+            }
+            minX = Math.min(minX, Math.min(shape.x, shape.x + shape.width));
+            minY = Math.min(minY, Math.min(shape.y, shape.y + shape.height));
+            maxX = Math.max(maxX, Math.max(shape.x, shape.x + shape.width));
+            maxY = Math.max(maxY, Math.max(shape.y, shape.y + shape.height));
+          });
+
+          const distinctParentFrameIds = unique(selectedShapes.map((shape) => shape.frameId));
+          const parentFrameId =
+            distinctParentFrameIds.length === 1 ? distinctParentFrameIds[0] : undefined;
+
+          const padding = 24;
+          const frameId = Math.random().toString(36).substring(7);
+          const frameShape: Shape = {
+            id: frameId,
+            name: 'Frame',
+            type: ShapeType.Frame,
+            x: minX - padding,
+            y: minY - padding,
+            width: maxX - minX + padding * 2,
+            height: maxY - minY + padding * 2,
+            fill: theme === 'dark' ? '#111827' : '#eef2ff',
+            stroke: theme === 'dark' ? '#e5e7eb' : '#0f172a',
+            strokeWidth: 1,
+            rotation: 0,
+            clipContent: true,
+            layoutMode: 'none',
+            layoutGap: 12,
+            layoutPadding: { top: 16, right: 16, bottom: 16, left: 16 },
+            primaryAxisAlign: 'start',
+            crossAxisAlign: 'start',
+            cornerRadius: 8,
+            locked: false,
+            ...(parentFrameId ? { frameId: parentFrameId } : {}),
+          };
+
+          const nextShapes = page.shapes.map((shape) =>
+            selectedSet.has(shape.id)
+              ? {
+                  ...shape,
+                  frameId,
+                }
+              : shape
+          );
+          const firstSelectedIndex = page.shapes.findIndex((shape) => selectedSet.has(shape.id));
+          const insertionIndex = firstSelectedIndex >= 0 ? firstSelectedIndex : nextShapes.length;
+          nextShapes.splice(insertionIndex, 0, frameShape);
+          createdFrameId = frameId;
+          changed = true;
+          return { ...page, shapes: applyAutoLayoutToShapes(nextShapes) };
+        });
+
+        if (!changed) return;
+
+        set({
+          pages: updatedPages,
+          selectedIds: createdFrameId ? [createdFrameId] : selectedIds,
+        });
+        saveHistory();
+      },
+
+      moveSelectionIntoFrame: (frameId) => {
+        const { pages, currentPageId, selectedIds, saveHistory } = get();
+        if (selectedIds.length === 0) return;
+
+        let changed = false;
+        const selectedSet = new Set(selectedIds);
+        const updatedPages = pages.map((page) => {
+          if (page.id !== currentPageId) return page;
+          const targetFrame = page.shapes.find(
+            (shape) => shape.id === frameId && shape.type === ShapeType.Frame
+          );
+          if (!targetFrame) return page;
+
+          const nextShapes = page.shapes.map((shape) => {
+            if (!selectedSet.has(shape.id) || shape.id === frameId || shape.locked) return shape;
+            if (shape.frameId === frameId) return shape;
+            changed = true;
+            return { ...shape, frameId };
+          });
+          return { ...page, shapes: applyAutoLayoutToShapes(nextShapes) };
+        });
+
+        if (!changed) return;
+        set({ pages: updatedPages });
+        saveHistory();
+      },
+
+      removeSelectionFromFrame: () => {
+        const { pages, currentPageId, selectedIds, saveHistory } = get();
+        if (selectedIds.length === 0) return;
+
+        let changed = false;
+        const selectedSet = new Set(selectedIds);
+        const updatedPages = pages.map((page) => {
+          if (page.id !== currentPageId) return page;
+          const nextShapes = page.shapes.map((shape) => {
+            if (!selectedSet.has(shape.id) || shape.locked || !shape.frameId) return shape;
+            changed = true;
+            return { ...shape, frameId: undefined };
+          });
+          return { ...page, shapes: applyAutoLayoutToShapes(nextShapes) };
+        });
+
+        if (!changed) return;
+        set({ pages: updatedPages });
+        saveHistory();
       },
 
       groupSelectedLayers: () => {
@@ -536,7 +724,11 @@ export const useStore = create<SceneState>()(
           if (page.id !== currentPageId) return page;
           const moved = moveLayerNodeInTree(page, dragNodeKey, targetNodeKey, position);
           changed = moved.changed;
-          return moved.page;
+          if (!moved.changed) return moved.page;
+          return {
+            ...moved.page,
+            shapes: applyAutoLayoutToShapes(moved.page.shapes),
+          };
         });
         if (!changed) return;
         set({ pages: updatedPages });
@@ -550,7 +742,11 @@ export const useStore = create<SceneState>()(
           if (page.id !== currentPageId) return page;
           const moved = moveLayerNodeToRootEndInTree(page, dragNodeKey);
           changed = moved.changed;
-          return moved.page;
+          if (!moved.changed) return moved.page;
+          return {
+            ...moved.page,
+            shapes: applyAutoLayoutToShapes(moved.page.shapes),
+          };
         });
         if (!changed) return;
         set({ pages: updatedPages });
@@ -930,6 +1126,7 @@ export const useStore = create<SceneState>()(
         camera: state.camera,
         theme: state.theme,
         showGrid: state.showGrid,
+        pixelSnapEnabled: state.pixelSnapEnabled,
         leftSidebarVisible: state.leftSidebarVisible,
         rightSidebarVisible: state.rightSidebarVisible
       }),

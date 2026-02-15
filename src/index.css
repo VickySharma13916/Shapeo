@@ -170,6 +170,164 @@
   color: var(--ps-text-title);
 }
 
+.app-toolbar {
+  --tb-shell-bg: rgba(16, 18, 24, 0.78);
+  --tb-shell-border: rgba(255, 255, 255, 0.14);
+  --tb-shell-shadow: 0 22px 48px rgba(0, 0, 0, 0.5);
+  --tb-group-bg: rgba(0, 0, 0, 0.2);
+  --tb-group-border: rgba(255, 255, 255, 0.1);
+  --tb-text: #94a3b8;
+  --tb-text-strong: #e2e8f0;
+  --tb-text-dim: #64748b;
+  --tb-hover: rgba(255, 255, 255, 0.06);
+  --tb-divider: rgba(255, 255, 255, 0.1);
+  --tb-menu-bg: rgba(17, 24, 39, 0.92);
+  --tb-menu-border: rgba(255, 255, 255, 0.12);
+  --tb-menu-shadow: 0 16px 34px rgba(0, 0, 0, 0.5);
+}
+
+.theme-light .app-toolbar {
+  --tb-shell-bg: rgba(255, 255, 255, 0.94);
+  --tb-shell-border: rgba(148, 163, 184, 0.52);
+  --tb-shell-shadow: 0 18px 34px rgba(15, 23, 42, 0.14);
+  --tb-group-bg: rgba(241, 245, 249, 0.86);
+  --tb-group-border: rgba(148, 163, 184, 0.5);
+  --tb-text: #475569;
+  --tb-text-strong: #0f172a;
+  --tb-text-dim: #64748b;
+  --tb-hover: rgba(148, 163, 184, 0.25);
+  --tb-divider: rgba(148, 163, 184, 0.7);
+  --tb-menu-bg: rgba(255, 255, 255, 0.98);
+  --tb-menu-border: rgba(148, 163, 184, 0.56);
+  --tb-menu-shadow: 0 14px 30px rgba(15, 23, 42, 0.16);
+}
+
+.app-toolbar.tb-shell {
+  background: var(--tb-shell-bg);
+  border-color: var(--tb-shell-border);
+  box-shadow: var(--tb-shell-shadow);
+}
+
+.app-toolbar .tb-group {
+  background: var(--tb-group-bg);
+  border: 1px solid var(--tb-group-border);
+}
+
+.app-toolbar .tb-divider { background: var(--tb-divider); }
+.app-toolbar .tb-button {
+  color: var(--tb-text);
+  height: 36px;
+  min-width: 36px;
+}
+.app-toolbar .tb-button:hover {
+  color: var(--tb-text-strong);
+  background: var(--tb-hover);
+}
+.app-toolbar .tb-button:disabled { opacity: 0.45; cursor: not-allowed; }
+.app-toolbar .tb-button-active {
+  background: #2563eb;
+  color: white;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.35);
+}
+.app-toolbar .tb-icon-dim { color: var(--tb-text-dim); }
+.app-toolbar .tb-menu {
+  background: var(--tb-menu-bg);
+  border: 1px solid var(--tb-menu-border);
+  box-shadow: var(--tb-menu-shadow);
+}
+.app-toolbar .tb-menu-item {
+  color: var(--tb-text);
+  min-height: 34px;
+}
+.app-toolbar .tb-menu-item:hover {
+  color: var(--tb-text-strong);
+  background: var(--tb-hover);
+}
+.app-toolbar .tb-menu-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.app-toolbar .tb-menu-item:disabled:hover {
+  background: transparent;
+  color: var(--tb-text);
+}
+
+.app-toolbar .tb-danger-btn {
+  background: rgba(220, 38, 38, 0.16);
+  color: #ef4444;
+}
+.app-toolbar .tb-danger-btn:hover {
+  background: #dc2626;
+  color: white;
+}
+
+.layers-sidebar {
+  --ls-text-title: #f8fafc;
+  --ls-text-main: #cbd5e1;
+  --ls-text-muted: #94a3b8;
+  --ls-text-dim: #64748b;
+  --ls-surface: rgba(30, 41, 59, 0.22);
+  --ls-surface-hover: rgba(51, 65, 85, 0.45);
+  --ls-border: rgba(148, 163, 184, 0.22);
+}
+
+.theme-light .layers-sidebar {
+  --ls-text-title: #0f172a;
+  --ls-text-main: #334155;
+  --ls-text-muted: #475569;
+  --ls-text-dim: #64748b;
+  --ls-surface: rgba(226, 232, 240, 0.66);
+  --ls-surface-hover: rgba(203, 213, 225, 0.86);
+  --ls-border: rgba(148, 163, 184, 0.45);
+}
+
+.layers-sidebar .ls-title { color: var(--ls-text-title); }
+.layers-sidebar .ls-text-main { color: var(--ls-text-main); }
+.layers-sidebar .ls-text-muted { color: var(--ls-text-muted); }
+.layers-sidebar .ls-text-dim { color: var(--ls-text-dim); }
+.layers-sidebar .ls-divider { border-color: var(--ls-border); }
+.layers-sidebar .ls-icon-btn {
+  color: var(--ls-text-muted);
+}
+.layers-sidebar .ls-icon-btn:hover {
+  color: var(--ls-text-title);
+  background: var(--ls-surface-hover);
+}
+.layers-sidebar .ls-icon-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+.layers-sidebar .ls-icon-btn:disabled:hover {
+  background: transparent;
+  color: var(--ls-text-muted);
+}
+.layers-sidebar .ls-row {
+  color: var(--ls-text-main);
+}
+.layers-sidebar .ls-row:hover {
+  background: var(--ls-surface-hover);
+  color: var(--ls-text-title);
+}
+
+@media (max-width: 1200px) {
+  .layers-sidebar,
+  .property-sidebar {
+    width: 15rem !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .app-toolbar {
+    bottom: 12px !important;
+    padding: 8px 10px !important;
+    gap: 6px !important;
+  }
+  .app-toolbar .tb-button {
+    min-width: 32px;
+    height: 32px;
+  }
+}
+
 * {
   transition-property:
     background-color, border-color, color, fill, stroke, opacity, box-shadow,

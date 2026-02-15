@@ -8,6 +8,7 @@ export const duplicateShapeForPaste = (shape: Shape): Shape => {
       ...shape,
       id: Math.random().toString(36).substring(7),
       groupId: undefined,
+      frameId: undefined,
       x: shape.x + PASTE_OFFSET,
       y: shape.y + PASTE_OFFSET,
       x2: shape.x2 + PASTE_OFFSET,
@@ -19,6 +20,7 @@ export const duplicateShapeForPaste = (shape: Shape): Shape => {
     ...shape,
     id: Math.random().toString(36).substring(7),
     groupId: undefined,
+    frameId: undefined,
     x: shape.x + PASTE_OFFSET,
     y: shape.y + PASTE_OFFSET,
   };

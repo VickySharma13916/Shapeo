@@ -11,6 +11,7 @@ export type Camera = {
 
 export const ShapeType = {
   Rectangle: 'rect',
+  Frame: 'frame',
   Circle: 'circle',
   Line: 'line',
   Ellipse: 'ellipse',
@@ -26,6 +27,7 @@ export interface BaseShape {
   name?: string;
   type: ShapeType;
   groupId?: string;
+  frameId?: string;
   locked?: boolean;
   x: number;
   y: number;
@@ -54,6 +56,21 @@ export interface RectShape extends BaseShape {
   type: 'rect';
 }
 
+export interface FrameShape extends BaseShape {
+  type: 'frame';
+  clipContent?: boolean;
+  layoutMode?: 'none' | 'horizontal' | 'vertical';
+  layoutGap?: number;
+  layoutPadding?: {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+  };
+  primaryAxisAlign?: 'start' | 'center' | 'end' | 'space-between';
+  crossAxisAlign?: 'start' | 'center' | 'end';
+}
+
 export interface CircleShape extends BaseShape {
   type: 'circle';
 }
@@ -77,7 +94,7 @@ export interface EllipseShape extends BaseShape {
   ry: number;
 }
 
-export type Shape = RectShape | CircleShape | ImageShape | LineShape | EllipseShape;
+export type Shape = RectShape | FrameShape | CircleShape | ImageShape | LineShape | EllipseShape;
 
 
 export type Handle = 'nw' | 'n' | 'ne' | 'w' | 'e' | 'sw' | 's' | 'se';

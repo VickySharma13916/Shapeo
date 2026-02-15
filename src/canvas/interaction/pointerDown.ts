@@ -10,6 +10,9 @@ export const createPointerDownState = ( state: InteractionState, mode: Interacti
   activeHandleId: null,
   dragOffsetById: {},
   marqueeStart: null,
+  rotationPivot: null,
+  multiBounds: null,
+  rotationSnapshots: [],
   ...extra,
 });
 

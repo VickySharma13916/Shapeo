@@ -2,7 +2,7 @@ import React from 'react';
 import { 
   ChevronDown, Download, ZoomIn, ZoomOut, PanelRight, Target, Droplet, Square, Home, RotateCw, ChevronsUp, ChevronUp, 
   ChevronDown as ChevronDownIcon, ChevronsDown, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, 
-  AlignEndVertical, Link, Unlink, Box
+  AlignEndVertical, Link, Unlink, Box, Magnet
 } from 'lucide-react';
 
 import { useStore } from '../store/useStore';
@@ -10,28 +10,65 @@ import { useStore } from '../store/useStore';
 import { exportSelectionToPNG } from '../engine/export';
 import type { Shape } from '../engine/types';
 
-const SidebarSection = ({ title, children, icon }: { title: string, children: React.ReactNode, icon?: React.ReactNode }) => (
-  <div className="border-b ps-divider pb-4 mb-4 last:border-0">
-    <div className="flex items-center justify-between mb-3.5 px-0.5">
-      <span className="text-[11px] font-bold ps-text-title uppercase tracking-wider">{title}</span>
-      {icon || <ChevronDown size={12} className="ps-text-dim" />}
+const SidebarSection = ({
+  title,
+  children,
+  icon,
+  defaultOpen = true,
+}: {
+  title: string;
+  children: React.ReactNode;
+  icon?: React.ReactNode;
+  defaultOpen?: boolean;
+}) => {
+  const storageKey = `shapeo:property-section:${title.toLowerCase()}`;
+  const [isOpen, setIsOpen] = React.useState<boolean>(() => {
+    if (typeof window === 'undefined') return defaultOpen;
+    const stored = window.localStorage.getItem(storageKey);
+    if (stored === null) return defaultOpen;
+    return stored === '1';
+  });
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(storageKey, isOpen ? '1' : '0');
+  }, [isOpen, storageKey]);
+
+  return (
+    <div className="border-b ps-divider pb-4 mb-4 last:border-0">
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="w-full flex items-center justify-between px-0.5 cursor-pointer"
+      >
+        <span className="text-[11px] font-bold ps-text-title uppercase tracking-wider">{title}</span>
+        <span className="flex items-center gap-2">
+          {icon}
+          <ChevronDown
+            size={12}
+            className={`ps-text-dim fluent-smooth ${isOpen ? '' : '-rotate-90'}`}
+          />
+        </span>
+      </button>
+      {isOpen && <div className="mt-4">{isOpen ? children : null}</div>}
     </div>
-    {children}
-  </div>
-);
+  );
+};
 
 export default function PropertySidebar() {
   const { 
     pages, currentPageId, selectedIds, updateShape, saveHistory, camera, setCamera, zoomIn, zoomOut, centerObject, rightSidebarVisible, 
     toggleRightSidebar, bringToFront, sendToBack, moveForward, moveBackward, alignLeft, alignCenter, alignRight, alignTop, alignMiddle, 
-    alignBottom, toggleAspectRatioLock, theme
+    alignBottom, toggleAspectRatioLock, pixelSnapEnabled, togglePixelSnap
   } = useStore();
-  const isLight = theme === 'light';
 
   const currentPage = pages.find(p => p.id === currentPageId);
   const shapes = currentPage?.shapes || [];
   const selectedShapes = shapes.filter(s => selectedIds.includes(s.id));
   const firstShape = selectedShapes[0];
+  const selectedFrameIds = selectedShapes
+    .filter((shape): shape is Extract<Shape, { type: 'frame' }> => shape.type === 'frame')
+    .map((shape) => shape.id);
 
   // Local state for smooth input editing
   const [localValues, setLocalValues] = React.useState<Record<string, number>>({});
@@ -45,6 +82,11 @@ export default function PropertySidebar() {
     selectedIds.forEach(id => updateShape(id, updates));
     if (commitNow) saveHistory();
   }, [selectedIds, updateShape, saveHistory]);
+
+  const handleFrameBulkUpdate = (updates: Partial<Extract<Shape, { type: 'frame' }>>, commitNow = false) => {
+    selectedFrameIds.forEach((id) => updateShape(id, updates as Partial<Shape>));
+    if (commitNow) saveHistory();
+  };
   
   const handleCommit = React.useCallback(() => {
     saveHistory();
@@ -107,32 +149,38 @@ export default function PropertySidebar() {
       title="Navigator" 
       icon={<span className="ps-text-title text-[10px] font-mono">{Math.round(camera.zoom * 100)}%</span>}
     >
-      <div className="grid grid-cols-5 gap-1">
-        <button onClick={zoomIn} className="p-2.5 cursor-pointer flex justify-center ps-surface ps-hover-solid rounded text-white fluent-smooth fluent-reveal" title="Zoom In"><ZoomIn size={14} /></button>
-        <button onClick={zoomOut} className="p-2.5 cursor-pointer flex justify-center ps-surface ps-hover-solid rounded text-white fluent-smooth fluent-reveal" title="Zoom Out"><ZoomOut size={14} /></button>
-        <button onClick={resetView} className="p-2.5 cursor-pointer flex justify-center ps-surface ps-hover-solid rounded text-white fluent-smooth fluent-reveal" title="Reset View"><Home size={14} /></button>
+      <div className="grid grid-cols-6 gap-1">
+        <button onClick={zoomIn} className="p-2.5 cursor-pointer flex justify-center ps-surface ps-hover-solid rounded ps-text-title fluent-smooth fluent-reveal" title="Zoom In"><ZoomIn size={14} /></button>
+        <button onClick={zoomOut} className="p-2.5 cursor-pointer flex justify-center ps-surface ps-hover-solid rounded ps-text-title fluent-smooth fluent-reveal" title="Zoom Out"><ZoomOut size={14} /></button>
+        <button onClick={resetView} className="p-2.5 cursor-pointer flex justify-center ps-surface ps-hover-solid rounded ps-text-title fluent-smooth fluent-reveal" title="Reset View"><Home size={14} /></button>
         <button 
           onClick={() => selectedIds.length > 0 && centerObject(selectedIds[0])} 
           disabled={selectedIds.length === 0}
           className={`p-2.5 flex justify-center cursor-pointer rounded fluent-smooth ${selectedIds.length > 0 ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white fluent-reveal' : 'ps-surface-soft ps-text-disabled cursor-not-allowed'}`}
           title="Focus Selection"
         ><Target size={14} /></button>
-        {/* <button onClick={toggleGrid} className="p-2.5 cursor-pointer flex justify-center ps-surface ps-hover-solid rounded text-white transition-colors" title="Toggle Grid"><Grid3x3 size={14} /></button> */}
+        <button
+          onClick={togglePixelSnap}
+          className={`p-2.5 cursor-pointer flex justify-center rounded fluent-smooth ${
+            pixelSnapEnabled
+              ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white fluent-reveal'
+              : 'ps-surface ps-hover-solid ps-text-title'
+          }`}
+          title={pixelSnapEnabled ? 'Pixel Snap: ON' : 'Pixel Snap: OFF'}
+        >
+          <Magnet size={14} />
+        </button>
       </div>
     </SidebarSection>
   );
 
   if (!rightSidebarVisible) {
     return (
-      <div className={`property-sidebar fixed top-4 right-4 w-64 h-auto fluent-acrylic premium-panel rounded-lg z-50 p-3 ${isLight ? 'text-slate-700' : ''}`}>
+      <div className="property-sidebar fixed top-4 right-4 w-64 h-auto fluent-acrylic premium-panel rounded-lg z-50 p-3">
         {renderNavigator()}
         <button 
           onClick={toggleRightSidebar}
-          className={`w-full mt-2 py-1.5 rounded text-[10px] font-bold fluent-smooth flex items-center justify-center gap-2 fluent-reveal ${
-            isLight
-              ? 'bg-slate-200/90 hover:bg-slate-300 text-slate-800'
-              : 'ps-solid ps-hover-solid text-white'
-          }`}
+          className="w-full mt-2 py-1.5 rounded text-[10px] font-bold ps-solid ps-hover-solid ps-text-title fluent-smooth flex items-center justify-center gap-2 fluent-reveal"
         >
           <PanelRight size={14} />
           Show Properties
@@ -142,10 +190,10 @@ export default function PropertySidebar() {
   }
 
   return (
-    <div className={`property-sidebar fixed top-4 right-4 w-64 h-[calc(100%-30px)] rounded-lg fluent-acrylic premium-panel overflow-y-auto z-50 p-4 select-none flex flex-col fluent-scrollbar ${isLight ? 'text-slate-700' : ''}`}>
+    <div className="property-sidebar fixed top-4 right-4 w-64 h-[calc(100%-30px)] rounded-lg fluent-acrylic premium-panel overflow-y-auto z-50 p-4 select-none flex flex-col fluent-scrollbar">
       <div className="flex justify-between items-center mb-4 px-0.5">
-        <span className={`text-xs font-bold uppercase tracking-widest opacity-70 ${isLight ? 'text-slate-700' : 'text-white'}`}>Inspector</span>
-        <button onClick={toggleRightSidebar} className={`cursor-pointer fluent-smooth fluent-reveal ${isLight ? 'text-blue-600 hover:text-slate-900' : 'text-blue-400 hover:text-white'}`}>
+        <span className="text-xs font-bold uppercase tracking-widest opacity-70 ps-text-title">Inspector</span>
+        <button onClick={toggleRightSidebar} className="cursor-pointer fluent-smooth fluent-reveal text-blue-400 hover:text-blue-300">
           <PanelRight size={16} />
         </button>
       </div>
@@ -156,7 +204,7 @@ export default function PropertySidebar() {
       {!firstShape ? (
         <div className="flex-1 flex flex-col items-center justify-center opacity-20">
           <div className="w-12 h-12 border-2 border-dashed ps-border rounded-lg mb-2" />
-          <span className="text-[10px] text-white uppercase font-bold tracking-widest">No Selection</span>
+          <span className="text-[10px] ps-text-title uppercase font-bold tracking-widest">No Selection</span>
         </div>
       ) : (
         <>
@@ -280,7 +328,7 @@ export default function PropertySidebar() {
                         {prop.label}
                       </span>
                       <input 
-                        className="bg-transparent w-full outline-none text-white text-xs font-mono tabular-nums" 
+                        className="bg-transparent w-full outline-none ps-text-title text-xs font-mono tabular-nums" 
                         type="number"
                         value={displayValue}
                         onFocus={() => setLocalValues({ ...localValues, [prop.key]: Math.round(prop.value) })}
@@ -327,7 +375,7 @@ export default function PropertySidebar() {
                         {prop.label}
                       </span>
                       <input 
-                        className="bg-transparent w-full outline-none text-white text-xs font-mono tabular-nums" 
+                        className="bg-transparent w-full outline-none ps-text-title text-xs font-mono tabular-nums" 
                         type="number"
                         value={displayValue}
                         onFocus={() => setLocalValues({ ...localValues, [prop.key]: Math.round(prop.value) })}
@@ -384,7 +432,7 @@ export default function PropertySidebar() {
                         {prop.label}
                       </span>
                       <input 
-                        className="bg-transparent w-full outline-none text-white text-xs font-mono tabular-nums" 
+                        className="bg-transparent w-full outline-none ps-text-title text-xs font-mono tabular-nums" 
                         type="number"
                         value={displayValue}
                         onFocus={() => setLocalValues({ ...localValues, [prop.key]: Math.round(prop.value) })}
@@ -425,7 +473,7 @@ export default function PropertySidebar() {
                 <Droplet size={13} className="ps-text-subtle" />
                 <span className="ps-text-muted text-[10px] font-semibold w-12">Opacity</span>
                 <input 
-                  className="bg-transparent w-full outline-none text-white text-xs font-mono tabular-nums" 
+                  className="bg-transparent w-full outline-none ps-text-title text-xs font-mono tabular-nums" 
                   value={`${Math.round((firstShape.opacity ?? 1) * 100)}%`}
                   onBlur={handleCommit}
                   onChange={(e) => handleBulkUpdate({ opacity: parseInt(e.target.value.replace('%','')) / 100 || 1 })}
@@ -437,7 +485,7 @@ export default function PropertySidebar() {
                 <Square size={13} className="ps-text-subtle" />
                 <span className="ps-text-muted text-[10px] font-semibold w-12">Radius</span>
                 <input 
-                  className="bg-transparent w-full outline-none text-white text-xs font-mono tabular-nums" 
+                  className="bg-transparent w-full outline-none ps-text-title text-xs font-mono tabular-nums" 
                   type="number"
                   value={firstShape.cornerRadius ?? 0}
                   onBlur={handleCommit}
@@ -459,7 +507,7 @@ export default function PropertySidebar() {
                 <RotateCw size={13} className="ps-text-subtle" />
                 <span className="ps-text-muted text-[10px] font-semibold w-12">Rotation</span>
                 <input 
-                  className="bg-transparent w-full outline-none text-white text-xs font-mono tabular-nums" 
+                  className="bg-transparent w-full outline-none ps-text-title text-xs font-mono tabular-nums" 
                   type="number"
                   value={firstShape.rotation ?? 0}
                   onBlur={handleCommit}
@@ -475,6 +523,136 @@ export default function PropertySidebar() {
                 />
                 <span className="ps-text-subtle text-[10px]">deg</span>
               </div>
+
+              {firstShape.type === 'frame' && (
+                <>
+                  <div className="flex items-center justify-between ps-surface px-2 py-2 rounded-md border ps-border ps-hover-border fluent-smooth">
+                    <span className="ps-text-muted text-[10px] font-semibold">Clip Content</span>
+                    <button
+                      onClick={() => handleFrameBulkUpdate({ clipContent: !(firstShape.clipContent ?? true) }, true)}
+                      className={`px-2.5 py-1 rounded text-[10px] font-semibold fluent-smooth ${
+                        (firstShape.clipContent ?? true)
+                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500'
+                          : 'ps-surface ps-text-subtle border ps-border'
+                      }`}
+                    >
+                      {(firstShape.clipContent ?? true) ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 ps-surface px-2 py-2 rounded-md border ps-border">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="ps-text-muted text-[10px] font-semibold">Auto Layout</span>
+                      <select
+                        className="ps-surface ps-text-strong text-[11px] px-2 py-1 rounded-md border ps-border outline-none cursor-pointer focus:border-blue-500 fluent-smooth"
+                        value={firstShape.layoutMode ?? 'none'}
+                        onChange={(e) =>
+                          handleFrameBulkUpdate(
+                            {
+                              layoutMode: e.target.value as 'none' | 'horizontal' | 'vertical',
+                            },
+                            true
+                          )
+                        }
+                      >
+                        <option value="none">Off</option>
+                        <option value="horizontal">Horizontal</option>
+                        <option value="vertical">Vertical</option>
+                      </select>
+                    </div>
+
+                    {(firstShape.layoutMode ?? 'none') !== 'none' && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className="ps-text-muted text-[10px] font-semibold w-14">Gap</span>
+                          <input
+                            type="number"
+                            min={0}
+                            className="bg-transparent w-full outline-none ps-text-title text-xs font-mono tabular-nums border ps-border rounded px-2 py-1"
+                            value={firstShape.layoutGap ?? 12}
+                            onBlur={handleCommit}
+                            onChange={(e) =>
+                              handleFrameBulkUpdate({ layoutGap: Math.max(0, parseInt(e.target.value) || 0) })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <span className="ps-text-muted text-[10px] font-semibold">Padding</span>
+                          <div className="grid grid-cols-2 gap-2 mt-1">
+                            {[
+                              { key: 'top', label: 'Top' },
+                              { key: 'right', label: 'Right' },
+                              { key: 'bottom', label: 'Bottom' },
+                              { key: 'left', label: 'Left' },
+                            ].map((item) => (
+                              <div key={item.key} className="flex items-center gap-2">
+                                <span className="ps-text-subtle text-[9px] w-8">{item.label}</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  className="bg-transparent w-full outline-none ps-text-title text-xs font-mono tabular-nums border ps-border rounded px-2 py-1"
+                                  value={firstShape.layoutPadding?.[item.key as 'top' | 'right' | 'bottom' | 'left'] ?? 16}
+                                  onBlur={handleCommit}
+                                  onChange={(e) =>
+                                    handleFrameBulkUpdate({
+                                      layoutPadding: {
+                                        top: firstShape.layoutPadding?.top ?? 16,
+                                        right: firstShape.layoutPadding?.right ?? 16,
+                                        bottom: firstShape.layoutPadding?.bottom ?? 16,
+                                        left: firstShape.layoutPadding?.left ?? 16,
+                                        [item.key]: Math.max(0, parseInt(e.target.value) || 0),
+                                      },
+                                    })
+                                  }
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <span className="ps-text-subtle text-[9px]">Primary</span>
+                            <select
+                              className="w-full ps-surface ps-text-strong text-[11px] px-2 py-1 rounded-md border ps-border outline-none cursor-pointer focus:border-blue-500 fluent-smooth"
+                              value={firstShape.primaryAxisAlign ?? 'start'}
+                              onChange={(e) =>
+                                handleFrameBulkUpdate(
+                                  { primaryAxisAlign: e.target.value as 'start' | 'center' | 'end' | 'space-between' },
+                                  true
+                                )
+                              }
+                            >
+                              <option value="start">Start</option>
+                              <option value="center">Center</option>
+                              <option value="end">End</option>
+                              <option value="space-between">Space Between</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="ps-text-subtle text-[9px]">Cross</span>
+                            <select
+                              className="w-full ps-surface ps-text-strong text-[11px] px-2 py-1 rounded-md border ps-border outline-none cursor-pointer focus:border-blue-500 fluent-smooth"
+                              value={firstShape.crossAxisAlign ?? 'start'}
+                              onChange={(e) =>
+                                handleFrameBulkUpdate(
+                                  { crossAxisAlign: e.target.value as 'start' | 'center' | 'end' },
+                                  true
+                                )
+                              }
+                            >
+                              <option value="start">Start</option>
+                              <option value="center">Center</option>
+                              <option value="end">End</option>
+                            </select>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </SidebarSection>
 
@@ -526,7 +704,7 @@ export default function PropertySidebar() {
                   <div className="flex items-center gap-2 ps-surface px-2 py-2 rounded-md border ps-border focus-within:border-blue-500 ps-focus-surface fluent-smooth ps-hover-border">
                     <span className="ps-text-muted text-[10px] font-semibold w-8">Blur</span>
                     <input 
-                      className="bg-transparent w-full outline-none text-white text-xs font-mono tabular-nums" 
+                      className="bg-transparent w-full outline-none ps-text-title text-xs font-mono tabular-nums" 
                       type="number"
                       min="0"
                       value={firstShape.shadow.blur}
@@ -545,7 +723,7 @@ export default function PropertySidebar() {
                     <div className="flex items-center gap-2 ps-surface px-2 py-2 rounded-md border ps-border focus-within:border-blue-500 ps-focus-surface fluent-smooth ps-hover-border">
                       <span className="ps-text-muted text-[10px] font-semibold w-3">X</span>
                       <input 
-                        className="bg-transparent w-full outline-none text-white text-xs font-mono tabular-nums" 
+                        className="bg-transparent w-full outline-none ps-text-title text-xs font-mono tabular-nums" 
                         type="number"
                         value={firstShape.shadow.x}
                         onBlur={handleCommit}
@@ -560,7 +738,7 @@ export default function PropertySidebar() {
                     <div className="flex items-center gap-2 ps-surface px-2 py-2 rounded-md border ps-border focus-within:border-blue-500 ps-focus-surface fluent-smooth ps-hover-border">
                       <span className="ps-text-muted text-[10px] font-semibold w-3">Y</span>
                       <input 
-                        className="bg-transparent w-full outline-none text-white text-xs font-mono tabular-nums" 
+                        className="bg-transparent w-full outline-none ps-text-title text-xs font-mono tabular-nums" 
                         type="number"
                         value={firstShape.shadow.y}
                         onBlur={handleCommit}
@@ -619,7 +797,7 @@ export default function PropertySidebar() {
                 </select>
                 <input 
                   type="number"
-                  className="w-16 ps-surface text-white text-xs px-2 py-2 rounded-md border ps-border outline-none font-mono text-center tabular-nums ps-hover-surface ps-hover-border focus:border-blue-500 fluent-smooth"
+                  className="w-16 ps-surface ps-text-title text-xs px-2 py-2 rounded-md border ps-border outline-none font-mono text-center tabular-nums ps-hover-surface ps-hover-border focus:border-blue-500 fluent-smooth"
                   value={firstShape.strokeWidth}
                   onBlur={handleCommit}
                   onChange={(e) => handleBulkUpdate({ strokeWidth: parseInt(e.target.value) || 0 })}
