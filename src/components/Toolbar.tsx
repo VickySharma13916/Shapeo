@@ -1,6 +1,6 @@
 'use client';
 import {
-  ChevronDown, Circle, Copy, Folder, Hand, Layers, Lock, Minus, MousePointer2, RotateCcw, RotateCw, Plus, Square, SquareDashed, 
+  ArrowRight, ChevronDown, Circle, Copy, Folder, Hand, Layers, Lock, Minus, MousePointer2, PenTool, Repeat2, RotateCcw, RotateCw, Plus, SlidersHorizontal, Square, SquareDashed, 
   Trash2, Unlock, X, ChevronUp, ChevronsUp, ChevronsDown,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -10,15 +10,18 @@ import { useStore } from '../store/useStore';
 import ToolbarDropdown, { type ToolOption } from './ToolbarDropdown';
 
 type OpenMenu = 'arrange' | 'organize' | null;
+type DrawToolId = 'pen' | 'line' | 'arrow';
 
 const Toolbar = () => {
   const {
     addShape, selectedIds, setSelectedIds, pages, currentPageId, deleteShapes, mode, theme, setMode, undo, redo, history, 
     historyIndex, deleteImage, copy, paste, groupSelectedLayers, ungroupSelectedLayers, toggleLockSelected, moveForward, 
     moveBackward, bringToFront, sendToBack, createFrameFromSelection, moveSelectionIntoFrame, removeSelectionFromFrame,
+    drawSettings, toggleKeepDrawing, adjustDrawStroke, setDrawStrokeColor, adjustPencilSmoothing, adjustPencilSimplify, cycleArrowHeadStyle, toggleArrowDashed,
   } = useStore();
 
   const [activeShapeTool, setActiveShapeTool] = useState<ShapeTypeType>(ShapeType.Rectangle);
+  const [activeDrawTool, setActiveDrawTool] = useState<DrawToolId>('pen');
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const arrangeMenuRef = useRef<HTMLDivElement>(null);
   const organizeMenuRef = useRef<HTMLDivElement>(null);
@@ -66,9 +69,18 @@ const Toolbar = () => {
   const shapeOptions: ToolOption[] = [
     { id: ShapeType.Rectangle, label: 'Rectangle', icon: <Square size={17} />, shortcut: 'R', action: () => { setActiveShapeTool(ShapeType.Rectangle); addShape(ShapeType.Rectangle); } },
     { id: ShapeType.Frame, label: 'Frame', icon: <Square size={17} />, shortcut: 'F', action: () => { setActiveShapeTool(ShapeType.Frame); addShape(ShapeType.Frame); } },
-    { id: ShapeType.Line, label: 'Line', icon: <Minus size={17} />, shortcut: 'L', action: () => { setActiveShapeTool(ShapeType.Line); addShape(ShapeType.Line); } },
     { id: ShapeType.Ellipse, label: 'Ellipse', icon: <Circle size={17} />, shortcut: 'O', action: () => { setActiveShapeTool(ShapeType.Ellipse); addShape(ShapeType.Ellipse); } },
   ];
+  const drawToolOptions: ToolOption[] = [
+    { id: 'pen', label: 'Pencil', icon: <PenTool size={17} />, shortcut: 'P', action: () => { setActiveDrawTool('pen'); setMode('pen'); } },
+    { id: 'line', label: 'Line', icon: <Minus size={17} />, shortcut: 'L', action: () => { setActiveDrawTool('line'); setMode('line'); } },
+    { id: 'arrow', label: 'Arrow', icon: <ArrowRight size={17} />, shortcut: 'A', action: () => { setActiveDrawTool('arrow'); setMode('arrow'); } },
+  ];
+  const currentDrawToolId: DrawToolId =
+    mode === 'pen' || mode === 'line' || mode === 'arrow'
+      ? mode
+      : activeDrawTool;
+  const activeDrawStroke = drawSettings.strokeByTool[currentDrawToolId];
 
   return (
     <div className="app-toolbar tb-shell fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-2.5 rounded-2xl z-50 border fluent-acrylic">
@@ -87,6 +99,102 @@ const Toolbar = () => {
         >
           <Hand size={17} />
         </button>
+        <ToolbarDropdown
+          options={drawToolOptions}
+          activeToolId={currentDrawToolId}
+          theme={theme}
+          triggerTitle="Draw Tools"
+          className={mode === 'pen' || mode === 'line' || mode === 'arrow' ? 'tb-button-active rounded-lg' : ''}
+        />
+      </div>
+
+      <div className="tb-divider w-px h-7" />
+
+      <div className="tb-group flex items-center gap-1 p-1 rounded-xl">
+        <button
+          onClick={toggleKeepDrawing}
+          className={`tb-button p-2 rounded-lg fluent-smooth cursor-pointer ${drawSettings.keepDrawing ? 'tb-button-active' : ''}`}
+          title={drawSettings.keepDrawing ? 'Keep Drawing: ON' : 'Keep Drawing: OFF'}
+        >
+          <Repeat2 size={16} />
+        </button>
+        <button
+          onClick={() => adjustDrawStroke(currentDrawToolId, -1)}
+          className="tb-button p-2 rounded-lg fluent-smooth cursor-pointer"
+          title="Decrease Draw Stroke"
+        >
+          <Minus size={15} />
+        </button>
+        <div className="tb-button px-2 py-1.5 rounded-lg text-[11px] font-mono flex justify-center items-center">
+          {activeDrawStroke}
+        </div>
+        <button
+          onClick={() => adjustDrawStroke(currentDrawToolId, 1)}
+          className="tb-button p-2 rounded-lg fluent-smooth cursor-pointer"
+          title="Increase Draw Stroke"
+        >
+          <Plus size={15} />
+        </button>
+        <input
+          type="color"
+          value={drawSettings.strokeColorByTool[currentDrawToolId]}
+          onChange={(event) => setDrawStrokeColor(currentDrawToolId, event.target.value)}
+          className="tb-button w-8 h-8 p-1 rounded-lg cursor-pointer"
+          title="Draw Stroke Color"
+        />
+        <div className="relative group">
+          <button
+            className="tb-button p-2 rounded-lg fluent-smooth cursor-pointer"
+            title="Advanced Draw Settings"
+          >
+            <SlidersHorizontal size={15} />
+          </button>
+          <div className="tb-menu absolute bottom-full mb-2 left-0 min-w-52 rounded-xl p-2 z-50 invisible opacity-0 translate-y-1 group-hover:visible group-hover:opacity-100 group-hover:translate-y-0 group-focus-within:visible group-focus-within:opacity-100 group-focus-within:translate-y-0 transition-all duration-150">
+            {currentDrawToolId === 'pen' && (
+              <div className="space-y-2 text-[11px] font-semibold">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="tb-icon-dim">Smoothing</span>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => adjustPencilSmoothing(-0.05)} className="tb-button px-2 py-1 rounded-md">-</button>
+                    <span className="w-10 text-center font-mono">{drawSettings.pencilSmoothing.toFixed(2)}</span>
+                    <button onClick={() => adjustPencilSmoothing(0.05)} className="tb-button px-2 py-1 rounded-md">+</button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="tb-icon-dim">Simplify</span>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => adjustPencilSimplify(-0.15)} className="tb-button px-2 py-1 rounded-md">-</button>
+                    <span className="w-10 text-center font-mono">{drawSettings.pencilSimplify.toFixed(2)}</span>
+                    <button onClick={() => adjustPencilSimplify(0.15)} className="tb-button px-2 py-1 rounded-md">+</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {currentDrawToolId === 'arrow' && (
+              <div className="space-y-2 text-[11px] font-semibold">
+                <button
+                  onClick={cycleArrowHeadStyle}
+                  className="tb-menu-item w-full flex items-center justify-between px-2 py-2 rounded-lg"
+                >
+                  <span>Head</span>
+                  <span className="uppercase font-mono">{drawSettings.arrowHeadStyle}</span>
+                </button>
+                <button
+                  onClick={toggleArrowDashed}
+                  className={`tb-menu-item w-full flex items-center justify-between px-2 py-2 rounded-lg ${drawSettings.arrowDashed ? 'text-blue-500' : ''}`}
+                >
+                  <span>Dashed</span>
+                  <span className="font-mono">{drawSettings.arrowDashed ? 'ON' : 'OFF'}</span>
+                </button>
+              </div>
+            )}
+            {currentDrawToolId === 'line' && (
+              <div className="text-[11px] font-semibold tb-icon-dim px-1 py-1.5">
+                Line uses stroke + color controls.
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="tb-divider w-px h-7" />

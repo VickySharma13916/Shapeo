@@ -64,7 +64,7 @@ const applyFrameClipPath = (ctx: CanvasRenderingContext2D, frame: Shape) => {
 };
 
 const getShapeBounds = (shape: Shape) => {
-  if (shape.type === 'line') {
+  if (shape.type === 'line' || shape.type === 'arrow') {
     return {
       minX: Math.min(shape.x, shape.x2),
       minY: Math.min(shape.y, shape.y2),

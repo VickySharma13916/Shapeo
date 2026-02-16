@@ -27,7 +27,7 @@ export const getPointerDownResizeHandleId = (
   }
 
   // Lines resize only from endpoints; body clicks should drag the line.
-  if (selectedShape.type === 'line') {
+  if (selectedShape.type === 'line' || selectedShape.type === 'arrow') {
     return null;
   }
 

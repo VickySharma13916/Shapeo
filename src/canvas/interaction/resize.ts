@@ -20,7 +20,7 @@ export const getResizeUpdates = ({
   worldPos,
   snapToGrid,
 }: ResizeUpdateInput): ShapeUpdates | null => {
-  if (shape.type === 'line') {
+  if (shape.type === 'line' || shape.type === 'arrow') {
     if (activeHandleId === 'start') {
       return { x: snapToGrid(worldPos.x), y: snapToGrid(worldPos.y) };
     }

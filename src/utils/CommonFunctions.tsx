@@ -32,7 +32,7 @@ export const getRotationHandleAtPos = (worldPos: Point, shape: Shape, zoom: numb
 export const getHandleAtPos = (worldPos: { x: number; y: number }, shape: Shape, zoom: number) => {
   const handleSize = 10 / zoom;
   
-  if (shape.type === 'line') {
+  if (shape.type === 'line' || shape.type === 'arrow') {
     const handles = [
       { id: 'start', x: shape.x, y: shape.y },
       { id: 'end', x: shape.x2, y: shape.y2 },

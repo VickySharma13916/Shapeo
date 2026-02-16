@@ -136,6 +136,15 @@ export const useKeyboard = () => {
       if (key === 'h' && !isMod) {
         setMode('pan');
       }
+      if (key === 'p' && !isMod) {
+        setMode('pen');
+      }
+      if (key === 'l' && !isMod) {
+        setMode('line');
+      }
+      if (key === 'a' && !isMod) {
+        setMode('arrow');
+      }
       if (key === 'f' && !isMod) {
         addShape(ShapeType.Frame);
       }

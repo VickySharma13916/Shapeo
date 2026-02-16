@@ -15,6 +15,18 @@ import { getCanvasCursor } from '../canvas/interaction/cursor';
 import { createInteractionState, type InteractionState } from '../canvas/interaction/types';
 import { drawScene } from '../canvas/render/drawScene';
 
+const constrainTo45 = (start: Point, end: Point): Point => {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const angle = Math.atan2(dy, dx);
+  const distance = Math.hypot(dx, dy);
+  const snapped = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+  return {
+    x: start.x + Math.cos(snapped) * distance,
+    y: start.y + Math.sin(snapped) * distance,
+  };
+};
+
 const Canvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const interactionRef = useRef<InteractionState>(createInteractionState());
@@ -22,10 +34,13 @@ const Canvas = () => {
   const [smartGuides, setSmartGuides] = useState<AlignmentGuide[]>([]);
   const [cursor, setCursor] = useState<string>('default');
   const [imageRenderTick, setImageRenderTick] = useState(0);
+  const activePathIdRef = useRef<string | null>(null);
+  const activeLinearIdRef = useRef<string | null>(null);
 
   const { camera } = useCamera(canvasRef);
   const {
     selectedIds, setSelectedIds, toggleSelection, updateShape, mode, theme, showGrid, pixelSnapEnabled, setCamera, saveHistory, currentPageId, pages, bringToFront,
+    startPath, appendPathPoint, updatePathStraightEndpoint, startLinearShape, updateLinearShapeEndpoint, setMode, drawSettings,
   } = useStore();
 
   const shapes = useMemo(
@@ -83,6 +98,20 @@ const Canvas = () => {
       return;
     }
 
+    if (mode === 'pen') {
+      const pathId = startPath(worldPos);
+      activePathIdRef.current = pathId;
+      if (pathId) event.currentTarget.setPointerCapture(event.pointerId);
+      return;
+    }
+
+    if (mode === 'line' || mode === 'arrow') {
+      const shapeId = startLinearShape(mode, worldPos);
+      activeLinearIdRef.current = shapeId;
+      if (shapeId) event.currentTarget.setPointerCapture(event.pointerId);
+      return;
+    }
+
     const result = handlePointerDown({
       worldPos,
       shiftKey: event.shiftKey,
@@ -110,6 +139,40 @@ const Canvas = () => {
       return;
     }
 
+    if (mode === 'pen') {
+      const activePathId = activePathIdRef.current;
+      if (!activePathId) return;
+      if (event.shiftKey) {
+        const activePath = shapes.find(
+          (shape): shape is Extract<Shape, { type: 'path' }> =>
+            shape.id === activePathId && shape.type === 'path'
+        );
+        if (activePath) {
+          const anchor = activePath.points[0]
+            ? { x: activePath.x + activePath.points[0].x, y: activePath.y + activePath.points[0].y }
+            : { x: activePath.x, y: activePath.y };
+          updatePathStraightEndpoint(activePathId, constrainTo45(anchor, worldPos));
+        }
+      } else {
+        appendPathPoint(activePathId, worldPos);
+      }
+      return;
+    }
+
+    if (mode === 'line' || mode === 'arrow') {
+      const activeLinearId = activeLinearIdRef.current;
+      if (!activeLinearId) return;
+      const activeLinear = shapes.find(
+        (shape) => shape.id === activeLinearId && (shape.type === 'line' || shape.type === 'arrow')
+      );
+      const target =
+        event.shiftKey && activeLinear
+          ? constrainTo45({ x: activeLinear.x, y: activeLinear.y }, worldPos)
+          : worldPos;
+      updateLinearShapeEndpoint(activeLinearId, target);
+      return;
+    }
+
     const selectedShape: Shape | null =
       selectedIds.length === 1
         ? shapes.find((shape) => shape.id === selectedIds[0]) ?? null
@@ -124,8 +187,8 @@ const Canvas = () => {
             let maxX = -Infinity;
             let maxY = -Infinity;
             selectedShapes.forEach((shape) => {
-              const bounds =
-                shape.type === 'line'
+      const bounds =
+                shape.type === 'line' || shape.type === 'arrow'
                   ? {
                       minX: Math.min(shape.x, shape.x2),
                       minY: Math.min(shape.y, shape.y2),
@@ -207,7 +270,25 @@ const Canvas = () => {
     }
   };
 
-  const handlePointerUpEvent = () => {
+  const handlePointerUpEvent = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    if (mode === 'pen') {
+      if (activePathIdRef.current) saveHistory();
+      activePathIdRef.current = null;
+      if (!drawSettings.keepDrawing) setMode('select');
+      return;
+    }
+
+    if (mode === 'line' || mode === 'arrow') {
+      if (activeLinearIdRef.current) saveHistory();
+      activeLinearIdRef.current = null;
+      if (!drawSettings.keepDrawing) setMode('select');
+      return;
+    }
+
     const result = handlePointerUp({ state: interactionRef.current });
 
     interactionRef.current = result.nextState;
@@ -267,15 +348,15 @@ const Canvas = () => {
   }, [camera, shapes, groups, selectedIds, showGrid, marqueeRect, smartGuides, imageRenderTick, theme]);
 
   return (
-    <canvas
+      <canvas
       ref={canvasRef}
       onPointerDown={handlePointerDownEvent}
       onPointerMove={handlePointerMoveEvent}
       onPointerUp={handlePointerUpEvent}
       onPointerLeave={handlePointerUpEvent}
       className="w-screen h-screen fixed block touch-none"
-      style={{ cursor }}
-    />
+        style={{ cursor: mode === 'pen' || mode === 'line' || mode === 'arrow' ? 'cell' : cursor }}
+      />
   );
 };
 

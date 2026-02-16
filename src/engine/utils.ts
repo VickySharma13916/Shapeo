@@ -15,6 +15,31 @@ export function worldToScreen(point: Point, camera: Camera): Point {
   };
 }
 
+export type ShapeBounds = {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+};
+
+export function getShapeBounds(shape: Shape): ShapeBounds {
+  if (shape.type === ShapeType.Line || shape.type === ShapeType.Arrow) {
+    return {
+      minX: Math.min(shape.x, shape.x2),
+      minY: Math.min(shape.y, shape.y2),
+      maxX: Math.max(shape.x, shape.x2),
+      maxY: Math.max(shape.y, shape.y2),
+    };
+  }
+
+  return {
+    minX: Math.min(shape.x, shape.x + shape.width),
+    minY: Math.min(shape.y, shape.y + shape.height),
+    maxX: Math.max(shape.x, shape.x + shape.width),
+    maxY: Math.max(shape.y, shape.y + shape.height),
+  };
+}
+
 export function isPointInShape(point: Point, shape: Shape): boolean {
   const { x, y, width, height, rotation = 0 } = shape;
   
@@ -51,7 +76,7 @@ export function isPointInShape(point: Point, shape: Shape): boolean {
     const normalizedX = (localX - cx) / rx;
     const normalizedY = (localY - cy) / ry;
     return (normalizedX * normalizedX + normalizedY * normalizedY) <= 1;
-  } else if (shape.type === ShapeType.Line) {
+  } else if (shape.type === ShapeType.Line || shape.type === ShapeType.Arrow) {
     // Distance from point (localX, localY) to line segment (x1, y1) - (x2, y2)
     // Note: line coords are also in the un-rotated space (since we un-rotated the point)
     const { x: x1, y: y1, x2, y2, strokeWidth } = shape;
@@ -88,6 +113,42 @@ export function isPointInShape(point: Point, shape: Shape): boolean {
     // Hit threshold: strokeWidth / 2 + padding (e.g. 5px)
     const threshold = Math.max(strokeWidth || 1, 5);
     return distance <= threshold;
+  } else if (shape.type === ShapeType.Path) {
+    if (shape.points.length === 0) {
+      return false;
+    }
+
+    const threshold = Math.max((shape.strokeWidth || 1) + 3, 6);
+    const absolutePoints = shape.points.map((pathPoint) => ({
+      x: shape.x + pathPoint.x,
+      y: shape.y + pathPoint.y,
+    }));
+
+    if (absolutePoints.length === 1) {
+      const dxPoint = localX - absolutePoints[0].x;
+      const dyPoint = localY - absolutePoints[0].y;
+      return Math.hypot(dxPoint, dyPoint) <= threshold;
+    }
+
+    for (let i = 0; i < absolutePoints.length - 1; i += 1) {
+      const p1 = absolutePoints[i];
+      const p2 = absolutePoints[i + 1];
+      const A = localX - p1.x;
+      const B = localY - p1.y;
+      const C = p2.x - p1.x;
+      const D = p2.y - p1.y;
+
+      const dot = A * C + B * D;
+      const lenSq = C * C + D * D;
+      const t = lenSq > 0 ? Math.max(0, Math.min(1, dot / lenSq)) : 0;
+      const projX = p1.x + t * C;
+      const projY = p1.y + t * D;
+      if (Math.hypot(localX - projX, localY - projY) <= threshold) {
+        return true;
+      }
+    }
+
+    return false;
   }
   
   return false;

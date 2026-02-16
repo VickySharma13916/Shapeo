@@ -14,6 +14,8 @@ export const ShapeType = {
   Frame: 'frame',
   Circle: 'circle',
   Line: 'line',
+  Arrow: 'arrow',
+  Path: 'path',
   Ellipse: 'ellipse',
   Image: 'image',
   Plus: "plus",
@@ -88,18 +90,44 @@ export interface LineShape extends BaseShape {
   lineCap?: 'butt' | 'round' | 'square';
 }
 
+export interface ArrowShape extends BaseShape {
+  type: 'arrow';
+  x2: number;
+  y2: number;
+  lineCap?: 'butt' | 'round' | 'square';
+  headStyle?: 'open' | 'filled' | 'double';
+  dashed?: boolean;
+}
+
+export interface PathShape extends BaseShape {
+  type: 'path';
+  points: Point[];
+  lineCap?: 'butt' | 'round' | 'square';
+  lineJoin?: 'round' | 'bevel' | 'miter';
+  smoothing?: number;
+  simplify?: number;
+}
+
 export interface EllipseShape extends BaseShape {
   type: 'ellipse';
   rx: number;
   ry: number;
 }
 
-export type Shape = RectShape | FrameShape | CircleShape | ImageShape | LineShape | EllipseShape;
+export type Shape =
+  | RectShape
+  | FrameShape
+  | CircleShape
+  | ImageShape
+  | LineShape
+  | ArrowShape
+  | PathShape
+  | EllipseShape;
 
 
 export type Handle = 'nw' | 'n' | 'ne' | 'w' | 'e' | 'sw' | 's' | 'se';
 
-export type Mode = 'select' | 'pan';
+export type Mode = 'select' | 'pan' | 'pen' | 'line' | 'arrow';
 
 // New: For Page-based organization
 export interface LayerGroup {

@@ -3,7 +3,7 @@ import type { Point, Shape } from '../../engine/types';
 import { getEdgeHandleAtPos, getHandleAtPos, getRadiusHandleAtPos, getRotationHandleAtPos } from '../../utils/CommonFunctions';
 
 type CursorInput = {
-  mode: 'select' | 'pan';
+  mode: 'select' | 'pan' | 'pen' | 'line' | 'arrow';
   selectedShape: Shape | null;
   worldPos: Point;
   zoom: number;
@@ -31,7 +31,9 @@ export const getCanvasCursor = ({
   const radiusHandle = getRadiusHandleAtPos(worldPos, selectedShape, zoom);
   const handle = getHandleAtPos(worldPos, selectedShape, zoom);
   const edgeHandle =
-    selectedShape.type === 'line' ? null : getEdgeHandleAtPos(worldPos, selectedShape, zoom);
+    selectedShape.type === 'line' || selectedShape.type === 'arrow'
+      ? null
+      : getEdgeHandleAtPos(worldPos, selectedShape, zoom);
   const threshold = 6 / zoom;
 
   if (rotationHandle) {
@@ -52,7 +54,7 @@ export const getCanvasCursor = ({
     return 'ns-resize';
   }
 
-  if (selectedShape.type !== 'line') {
+  if (selectedShape.type !== 'line' && selectedShape.type !== 'arrow') {
     const isNearLeft = Math.abs(worldPos.x - selectedShape.x) < threshold;
     const isNearRight =
       Math.abs(worldPos.x - (selectedShape.x + selectedShape.width)) < threshold;

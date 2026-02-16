@@ -71,7 +71,7 @@ const ROTATION_HANDLE_SIZE = 10;
 const MIN_MULTI_SIZE = 4;
 
 const getShapeBounds = (shape: Shape) => {
-  if (shape.type === 'line') {
+  if (shape.type === 'line' || shape.type === 'arrow') {
     return {
       minX: Math.min(shape.x, shape.x2),
       minY: Math.min(shape.y, shape.y2),
@@ -298,7 +298,7 @@ export const handlePointerDown = ({ worldPos, shiftKey, camera, mode, shapes, se
       const multiResizeHandle = bounds ? getMultiResizeHandleAtPos(worldPos, bounds, camera.zoom) : null;
       if (bounds && multiResizeHandle) {
         const rotationSnapshots = selectedShapes.map((shape) => {
-          if (shape.type === 'line') {
+          if (shape.type === 'line' || shape.type === 'arrow') {
             return {
               id: shape.id,
               kind: 'line' as const,
@@ -334,7 +334,7 @@ export const handlePointerDown = ({ worldPos, shiftKey, camera, mode, shapes, se
         const startAngle = Math.atan2(worldPos.y - pivot.y, worldPos.x - pivot.x) * (180 / Math.PI);
 
         const rotationSnapshots = selectedShapes.map((shape) => {
-          if (shape.type === 'line') {
+          if (shape.type === 'line' || shape.type === 'arrow') {
             return {
               id: shape.id,
               kind: 'line' as const,

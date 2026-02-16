@@ -45,7 +45,7 @@ export const drawSelection = ({ ctx, shape, selectedIds, zoom }: DrawSelectionIn
     ctx.lineWidth = 1 / zoom;
     ctx.setLineDash([4 / zoom, 3 / zoom]);
 
-    if (shape.type === 'line') {
+    if (shape.type === 'line' || shape.type === 'arrow') {
       ctx.beginPath();
       ctx.moveTo(shape.x, shape.y);
       ctx.lineTo(shape.x2, shape.y2);
@@ -70,7 +70,7 @@ export const drawSelection = ({ ctx, shape, selectedIds, zoom }: DrawSelectionIn
   const rotationHandleDistance = 30 / zoom;
   const rotationHandleSize = 5 / zoom;
 
-  if (shape.type === 'line') {
+  if (shape.type === 'line' || shape.type === 'arrow') {
     ctx.strokeStyle = '#3b82f6';
     ctx.lineWidth = 1.5 / zoom;
 
@@ -220,7 +220,7 @@ export const drawSelection = ({ ctx, shape, selectedIds, zoom }: DrawSelectionIn
   let labelY: number;
   let labelX: number;
 
-  if (shape.type === 'line') {
+  if (shape.type === 'line' || shape.type === 'arrow') {
     const length = Math.sqrt(
       Math.pow(shape.x2 - shape.x, 2) + Math.pow(shape.y2 - shape.y, 2)
     );

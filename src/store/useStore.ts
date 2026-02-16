@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import { ShapeType } from '../engine/types';
-import type { Mode, Shape, Page } from '../engine/types';
+import type { Mode, Shape, Page, Point } from '../engine/types';
 
 import { duplicateShapeForPaste } from './clipboard';
 import { applyAutoLayoutToShapes, getFrameAutoLayoutMinSize } from './autoLayout';
@@ -28,6 +28,17 @@ type HistoryEntry = {
 };
 
 type ThemeMode = 'dark' | 'light';
+type DrawTool = 'pen' | 'line' | 'arrow';
+type ArrowHeadStyle = 'open' | 'filled' | 'double';
+type DrawSettings = {
+  keepDrawing: boolean;
+  strokeByTool: Record<DrawTool, number>;
+  strokeColorByTool: Record<DrawTool, string>;
+  pencilSmoothing: number;
+  pencilSimplify: number;
+  arrowHeadStyle: ArrowHeadStyle;
+  arrowDashed: boolean;
+};
 
 const cloneHistoryEntry = (entry: HistoryEntry): HistoryEntry =>
   JSON.parse(JSON.stringify(entry)) as HistoryEntry;
@@ -58,6 +69,7 @@ interface SceneState {
   theme: ThemeMode;
   showGrid: boolean;
   pixelSnapEnabled: boolean;
+  drawSettings: DrawSettings;
   
   // --- UI & Clipboard ---
   clipboard: Shape[] | null;
@@ -75,6 +87,13 @@ interface SceneState {
   setMode: (mode: Mode) => void;
   toggleTheme: () => void;
   toggleGrid: () => void;
+  toggleKeepDrawing: () => void;
+  adjustDrawStroke: (tool: DrawTool, delta: number) => void;
+  setDrawStrokeColor: (tool: DrawTool, color: string) => void;
+  adjustPencilSmoothing: (delta: number) => void;
+  adjustPencilSimplify: (delta: number) => void;
+  cycleArrowHeadStyle: () => void;
+  toggleArrowDashed: () => void;
   togglePixelSnap: () => void;
   toggleLeftSidebar: () => void;
   toggleRightSidebar: () => void;
@@ -89,6 +108,11 @@ interface SceneState {
   
   // --- Object Manipulation ---
   addShape: (type: ShapeType) => void;
+  startLinearShape: (type: 'line' | 'arrow', point: Point) => string | null;
+  updateLinearShapeEndpoint: (id: string, point: Point) => void;
+  startPath: (point: Point) => string | null;
+  appendPathPoint: (id: string, point: Point) => void;
+  updatePathStraightEndpoint: (id: string, point: Point) => void;
   updateShape: (id: string, updates: ShapeUpdates, commitToHistory?: boolean) => void;
   deleteShapes: () => void;
   bringToFront: () => void;
@@ -151,6 +175,15 @@ export const useStore = create<SceneState>()(
       theme: 'dark',
       showGrid: false,
       pixelSnapEnabled: true,
+      drawSettings: {
+        keepDrawing: false,
+        strokeByTool: { pen: 2, line: 2, arrow: 2 },
+        strokeColorByTool: { pen: '#e5e7eb', line: '#e5e7eb', arrow: '#e5e7eb' },
+        pencilSmoothing: 0.65,
+        pencilSimplify: 1.25,
+        arrowHeadStyle: 'open',
+        arrowDashed: false,
+      },
       history: [
         createHistoryEntry({
           pages: initialPages,
@@ -178,6 +211,72 @@ export const useStore = create<SceneState>()(
       toggleTheme: () =>
         set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
       toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
+      toggleKeepDrawing: () =>
+        set((state) => ({
+          drawSettings: {
+            ...state.drawSettings,
+            keepDrawing: !state.drawSettings.keepDrawing,
+          },
+        })),
+      adjustDrawStroke: (tool, delta) =>
+        set((state) => ({
+          drawSettings: {
+            ...state.drawSettings,
+            strokeByTool: {
+              ...state.drawSettings.strokeByTool,
+              [tool]: Math.max(1, Math.min(24, state.drawSettings.strokeByTool[tool] + delta)),
+            },
+          },
+        })),
+      setDrawStrokeColor: (tool, color) =>
+        set((state) => ({
+          drawSettings: {
+            ...state.drawSettings,
+            strokeColorByTool: {
+              ...state.drawSettings.strokeColorByTool,
+              [tool]: color,
+            },
+          },
+        })),
+      adjustPencilSmoothing: (delta) =>
+        set((state) => ({
+          drawSettings: {
+            ...state.drawSettings,
+            pencilSmoothing: Math.max(
+              0,
+              Math.min(1, Number((state.drawSettings.pencilSmoothing + delta).toFixed(2)))
+            ),
+          },
+        })),
+      adjustPencilSimplify: (delta) =>
+        set((state) => ({
+          drawSettings: {
+            ...state.drawSettings,
+            pencilSimplify: Math.max(
+              0.2,
+              Math.min(8, Number((state.drawSettings.pencilSimplify + delta).toFixed(2)))
+            ),
+          },
+        })),
+      cycleArrowHeadStyle: () =>
+        set((state) => {
+          const styles: ArrowHeadStyle[] = ['open', 'filled', 'double'];
+          const currentIndex = styles.indexOf(state.drawSettings.arrowHeadStyle);
+          const nextIndex = (currentIndex + 1) % styles.length;
+          return {
+            drawSettings: {
+              ...state.drawSettings,
+              arrowHeadStyle: styles[nextIndex],
+            },
+          };
+        }),
+      toggleArrowDashed: () =>
+        set((state) => ({
+          drawSettings: {
+            ...state.drawSettings,
+            arrowDashed: !state.drawSettings.arrowDashed,
+          },
+        })),
       togglePixelSnap: () =>
         set((state) => ({ pixelSnapEnabled: !state.pixelSnapEnabled })),
       toggleLeftSidebar: () => set((state) => ({ leftSidebarVisible: !state.leftSidebarVisible })),
@@ -237,11 +336,11 @@ export const useStore = create<SceneState>()(
 
         let newShape: Shape;
 
-        if (type === ShapeType.Line) {
+        if (type === ShapeType.Line || type === ShapeType.Arrow) {
           newShape = {
             id: newId,
-            name: 'Line',
-            type: 'line',
+            name: type === ShapeType.Arrow ? 'Arrow' : 'Line',
+            type,
             x: centerX - 50,
             y: centerY,
             x2: centerX + 50,
@@ -254,6 +353,7 @@ export const useStore = create<SceneState>()(
             strokeWidth: 2,
             rotation: 0,
             lineCap: 'round',
+            ...(type === ShapeType.Arrow ? { headStyle: 'open', dashed: false } : {}),
           };
         } else if (type === ShapeType.Ellipse) {
           newShape = {
@@ -310,6 +410,187 @@ export const useStore = create<SceneState>()(
 
         set({ pages: updatedPages, selectedIds: [newId] });
         saveHistory();
+      },
+
+      startLinearShape: (type, point) => {
+        const { pages, currentPageId, theme, drawSettings } = get();
+        const page = pages.find((entry) => entry.id === currentPageId);
+        if (!page) return null;
+
+        const id = Math.random().toString(36).substring(7);
+        const fallbackStroke = theme === 'dark' ? '#e5e7eb' : '#0f172a';
+        const stroke = drawSettings.strokeColorByTool[type] || fallbackStroke;
+        const newShape: Shape = {
+          id,
+          name: type === 'arrow' ? 'Arrow' : 'Line',
+          type,
+          x: point.x,
+          y: point.y,
+          x2: point.x,
+          y2: point.y,
+          width: 1,
+          height: 1,
+          fill: 'transparent',
+          stroke,
+          strokeWidth: drawSettings.strokeByTool[type],
+          rotation: 0,
+          lineCap: 'round',
+          ...(type === 'arrow'
+            ? { headStyle: drawSettings.arrowHeadStyle, dashed: drawSettings.arrowDashed }
+            : {}),
+          locked: false,
+        };
+
+        const updatedPages = pages.map((entry) =>
+          entry.id === currentPageId
+            ? { ...entry, shapes: [...entry.shapes, newShape] }
+            : entry
+        );
+        set({ pages: updatedPages, selectedIds: [id] });
+        return id;
+      },
+
+      updateLinearShapeEndpoint: (id, point) => {
+        set((state) => ({
+          pages: state.pages.map((page) => {
+            if (page.id !== state.currentPageId) return page;
+            const nextShapes = page.shapes.map((shape) => {
+              if (
+                shape.id !== id ||
+                (shape.type !== 'line' && shape.type !== 'arrow') ||
+                shape.locked
+              ) {
+                return shape;
+              }
+              return {
+                ...shape,
+                x2: point.x,
+                y2: point.y,
+                width: Math.max(1, Math.abs(point.x - shape.x)),
+                height: Math.max(1, Math.abs(point.y - shape.y)),
+              };
+            });
+            return { ...page, shapes: nextShapes };
+          }),
+        }));
+      },
+
+      startPath: (point) => {
+        const { pages, currentPageId, theme, drawSettings } = get();
+        const page = pages.find((entry) => entry.id === currentPageId);
+        if (!page) return null;
+
+        const id = Math.random().toString(36).substring(7);
+        const fallbackStroke = theme === 'dark' ? '#e5e7eb' : '#0f172a';
+        const stroke = drawSettings.strokeColorByTool.pen || fallbackStroke;
+        const newPath: Shape = {
+          id,
+          name: 'Path',
+          type: 'path',
+          x: point.x,
+          y: point.y,
+          width: 1,
+          height: 1,
+          fill: 'transparent',
+          stroke,
+          strokeWidth: drawSettings.strokeByTool.pen,
+          rotation: 0,
+          points: [{ x: 0, y: 0 }],
+          lineCap: 'round',
+          lineJoin: 'round',
+          smoothing: drawSettings.pencilSmoothing,
+          simplify: drawSettings.pencilSimplify,
+          locked: false,
+        };
+
+        const updatedPages = pages.map((entry) =>
+          entry.id === currentPageId
+            ? { ...entry, shapes: [...entry.shapes, newPath] }
+            : entry
+        );
+        set({ pages: updatedPages, selectedIds: [id] });
+        return id;
+      },
+
+      appendPathPoint: (id, point) => {
+        set((state) => ({
+          pages: state.pages.map((page) => {
+            if (page.id !== state.currentPageId) return page;
+
+            const nextShapes = page.shapes.map((shape) => {
+              if (shape.id !== id || shape.type !== 'path' || shape.locked) return shape;
+
+              const localPoint = { x: point.x - shape.x, y: point.y - shape.y };
+              const lastPoint = shape.points[shape.points.length - 1];
+              if (lastPoint) {
+                const dx = localPoint.x - lastPoint.x;
+                const dy = localPoint.y - lastPoint.y;
+                if (Math.hypot(dx, dy) < (shape.simplify ?? 1.25)) return shape;
+              }
+
+              const rawPoints = [...shape.points, localPoint];
+              let minX = Infinity;
+              let minY = Infinity;
+              let maxX = -Infinity;
+              let maxY = -Infinity;
+              rawPoints.forEach((candidate) => {
+                minX = Math.min(minX, candidate.x);
+                minY = Math.min(minY, candidate.y);
+                maxX = Math.max(maxX, candidate.x);
+                maxY = Math.max(maxY, candidate.y);
+              });
+
+              const normalizedPoints = rawPoints.map((candidate) => ({
+                x: candidate.x - minX,
+                y: candidate.y - minY,
+              }));
+
+              return {
+                ...shape,
+                x: shape.x + minX,
+                y: shape.y + minY,
+                width: Math.max(1, maxX - minX),
+                height: Math.max(1, maxY - minY),
+                points: normalizedPoints,
+              };
+            });
+
+            return {
+              ...page,
+              shapes: nextShapes,
+            };
+          }),
+        }));
+      },
+
+      updatePathStraightEndpoint: (id, point) => {
+        set((state) => ({
+          pages: state.pages.map((page) => {
+            if (page.id !== state.currentPageId) return page;
+            const nextShapes = page.shapes.map((shape) => {
+              if (shape.id !== id || shape.type !== 'path' || shape.locked) return shape;
+              const anchor = shape.points[0] ?? { x: 0, y: 0 };
+              const anchorWorld = { x: shape.x + anchor.x, y: shape.y + anchor.y };
+              const raw = { x: point.x - anchorWorld.x, y: point.y - anchorWorld.y };
+              const minX = Math.min(0, raw.x);
+              const minY = Math.min(0, raw.y);
+              const maxX = Math.max(0, raw.x);
+              const maxY = Math.max(0, raw.y);
+              return {
+                ...shape,
+                x: anchorWorld.x + minX,
+                y: anchorWorld.y + minY,
+                width: Math.max(1, maxX - minX),
+                height: Math.max(1, maxY - minY),
+                points: [
+                  { x: 0 - minX, y: 0 - minY },
+                  { x: raw.x - minX, y: raw.y - minY },
+                ],
+              };
+            });
+            return { ...page, shapes: nextShapes };
+          }),
+        }));
       },
 
       updateShape: (id, updates, commitToHistory = false) => {

@@ -55,7 +55,7 @@ export const getDragUpdates = ({
     const nextX = shape === primaryShape ? baseX : shape.x + (baseX - primaryShape.x);
     const nextY = shape === primaryShape ? baseY : shape.y + (baseY - primaryShape.y);
 
-    if (shape.type === 'line') {
+    if (shape.type === 'line' || shape.type === 'arrow') {
       const deltaX = nextX - shape.x;
       const deltaY = nextY - shape.y;
       return {
@@ -83,7 +83,7 @@ export const getDragUpdates = ({
     const newX = worldPos.x - dragOffset.x + snapOffset.x;
     const newY = worldPos.y - dragOffset.y + snapOffset.y;
 
-    if (shape.type === 'line') {
+    if (shape.type === 'line' || shape.type === 'arrow') {
       const deltaX = newX - shape.x;
       const deltaY = newY - shape.y;
       updates.push({
